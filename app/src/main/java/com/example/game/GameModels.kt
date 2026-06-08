@@ -124,8 +124,48 @@ data class FactoryConfig(
     val nameAr: String
 )
 
+data class MachineUpgrade(
+    val id: String,
+    val nameAr: String,
+    val descAr: String,
+    val baseCost: Double,
+    val maxLevel: Int = 10
+)
+
+data class NewsItem(
+    val id: String,
+    val titleAr: String,
+    val contentAr: String,
+    val impactDescAr: String,
+    val affectedPartId: String,
+    val priceMultiplier: Double,
+    val isGoodNews: Boolean = false
+)
+
+data class LensOption(
+    val id: String,
+    val nameAr: String,
+    val descAr: String,
+    val baseCost: Double,
+    val qualityScore: Double,
+    val iconEmoji: String
+)
+
 // Pre-seeded lists representing the choices available in-game
 object GameDefaults {
+    val LensOptions = listOf(
+        LensOption("lens_standard", "عدسة قياسية (Standard)", "عدسة متوازنة للتصوير اليومي.", 15.0, 40.0, "📸"),
+        LensOption("lens_ultrawide", "عدسة واسعة جداً (Ultra-Wide)", "تسمح بالتقاط زوايا أوسع للمناظر الطبيعية.", 45.0, 65.0, "🔭"),
+        LensOption("lens_telephoto", "عدسة تقريب (Telephoto)", "تقريب بصري مذهل للأجسام البعيدة.", 85.0, 80.0, "🔍"),
+        LensOption("lens_periscope", "عدسة بيريسكوب الاحترافية", "تقريب فائق يصل لـ 100x بتقنية متقدمة.", 160.0, 95.0, "📡")
+    )
+
+    val NewsPool = listOf(
+        NewsItem("news_glass_shortage", "نقص حاد في زجاج العدسات", "تعرضت أكبر مصانع الزجاج في آسيا لإصلاحات طارئة مما قلل المعروض.", "ارتفاع تكلفة العدسات بنسبة 40%", "lens", 1.4, false),
+        NewsItem("news_tech_breakthrough", "انفراجة في تصنيع المعالجات", "تقنية جديدة تسمح بإنتاج أسرع للمعالجات الدقيقة.", "انخفاض تكلفة المعالجات بنسبة 15%", "cpu", 0.85, true),
+        NewsItem("news_mining_strike", "إضراب في مناجم الكوبالت", "توقف الإمدادات يؤدي لارتفاع جنوني في أسعار البطاريات.", "ارتفاع تكلفة البطاريات بنسبة 60%", "battery", 1.6, false),
+        NewsItem("news_shipping_crisis", "أزمة في ممرات الشحن الدولية", "تأخر الحاويات يرفع تكاليف تجميع الهيكل بشكل طفيف.", "ارتفاع تكلفة الهيكل بنسبة 20%", "case", 1.2, false)
+    )
     val Colors = listOf(
         PhoneColor("titanium_gold", "تيتانيوم ذهبي فاخر", "#FFD700", 80.0, 15.0),
         PhoneColor("stealth_black", "أسود كربوني غامق", "#1A1A1A", 20.0, 8.0),
@@ -186,6 +226,11 @@ object GameDefaults {
         OsOption("os_basic", "نظام أندرويد الخام (Pure OS)", "تجربة سريعة وخفيفة مع دعم كامل لخدمات جوجل.", 30.0, 5.0, "#4AD66D", "os_android", "ic_os_android", 1),
         OsOption("os_fruit", "نظام الفواكه المغلق (iOs Style)", "واجهة أنيقة، استقرار مذهل، وتجربة مستخدم فاخرة.", 85.0, 85.0, "#007AFF", "os_ios", "ic_os_ios", 3),
         OsOption("os_custom", "واجهة نوفا المعدلة (Nova UI)", "تخصيص كامل، ميزات إضافية، وتجربة فريدة لمستخدمي الطاقة.", 60.0, 35.0, "#FFA500", "os_nova", "ic_os_nova", 2)
+    )
+
+    val MachineUpgrades = listOf(
+        MachineUpgrade("up_speed", "زيادة سرعة الآلات", "تسرع حركة الأذرع الروبوتية وسير التجميع لتقليل وقت التصنيع بكل وحدة.", 15000.0),
+        MachineUpgrade("up_efficiency", "تحسين كفاءة التجميع", "تحسن دقة الآلات لتقليل هالك المواد وتحسين هوامش الربح.", 25000.0)
     )
 
     val FactoryConfigs = listOf(

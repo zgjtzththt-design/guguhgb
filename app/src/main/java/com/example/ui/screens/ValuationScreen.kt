@@ -36,6 +36,7 @@ fun ValuationScreen(
     selectedColor: PhoneColor,
     selectedProcessor: ProcessorOption,
     selectedCamera: CameraOption,
+    selectedLens: LensOption,
     selectedDesign: DesignStyle,
     selectedBattery: BatteryOption,
     selectedDisplay: DisplayOption,
@@ -227,7 +228,10 @@ fun ValuationScreen(
                     SpecItemAr(label = "شريحة المعالجة", value = selectedProcessor.nameAr, priceText = usdFormatter.format(selectedProcessor.baseCost))
 
                     // Camera item Row
-                    SpecItemAr(label = "عدسات التصوير", value = selectedCamera.nameAr, priceText = usdFormatter.format(selectedCamera.baseCost))
+                    SpecItemAr(label = "نوع مستشعر الكاميرا", value = selectedCamera.nameAr, priceText = usdFormatter.format(selectedCamera.baseCost))
+
+                    // Lens item Row
+                    SpecItemAr(label = "تكنولوجيا العدسات البصرية", value = selectedLens.nameAr, priceText = usdFormatter.format(selectedLens.baseCost))
 
                     // Battery item Row
                     SpecItemAr(label = "مخزون الطاقة والبطارية", value = selectedBattery.nameAr, priceText = usdFormatter.format(selectedBattery.baseCost))

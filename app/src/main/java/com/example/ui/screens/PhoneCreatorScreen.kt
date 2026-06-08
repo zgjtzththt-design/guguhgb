@@ -49,6 +49,7 @@ fun PhoneCreatorScreen(
     selectedColor: PhoneColor,
     selectedProcessor: ProcessorOption,
     selectedCamera: CameraOption,
+    selectedLens: LensOption,
     selectedDesign: DesignStyle,
     selectedBattery: BatteryOption,
     selectedDisplay: DisplayOption,
@@ -56,10 +57,12 @@ fun PhoneCreatorScreen(
     selectedTechs: Set<CustomTechnology>,
     selectedCameraPosition: CameraPosition,
     phoneName: String,
+    activeNews: com.example.game.NewsItem?,
     onSpecsChangedRaw: (
         color: PhoneColor?,
         processor: ProcessorOption?,
         camera: CameraOption?,
+        lens: LensOption?,
         design: DesignStyle?,
         battery: BatteryOption?,
         display: DisplayOption?,
@@ -71,11 +74,11 @@ fun PhoneCreatorScreen(
     onSubmitSpecs: () -> Unit,
     onCancel: () -> Unit
 ) {
-    val onSpecsChanged = { color: PhoneColor?, processor: ProcessorOption?, camera: CameraOption?, design: DesignStyle?, battery: BatteryOption?, display: DisplayOption?, os: OsOption?, techs: Set<CustomTechnology>?, name: String? ->
+    val onSpecsChanged = { color: PhoneColor?, processor: ProcessorOption?, camera: CameraOption?, lens: LensOption?, design: DesignStyle?, battery: BatteryOption?, display: DisplayOption?, os: OsOption?, techs: Set<CustomTechnology>?, name: String? ->
         if (techs == null) {
             GameSoundPlayer.playInteractSound()
         }
-        onSpecsChangedRaw(color, processor, camera, design, battery, display, os, techs, null, name)
+        onSpecsChangedRaw(color, processor, camera, lens, design, battery, display, os, techs, null, name)
     }
 
     val usdFormatter = NumberFormat.getCurrencyInstance(Locale.US).apply {
@@ -88,9 +91,14 @@ fun PhoneCreatorScreen(
     val context = LocalContext.current
 
     // Calculate real-time manufacturing cost
-    val currentCost = selectedProcessor.baseCost + selectedCamera.baseCost + selectedDesign.baseCost + 
-                      selectedColor.colorCost + selectedBattery.baseCost + selectedDisplay.baseCost + 
-                      selectedTechs.sumOf { it.addedCost }
+    val lensMult = if (activeNews?.affectedPartId == "lens") activeNews.priceMultiplier else 1.0
+    val cpuMult = if (activeNews?.affectedPartId == "cpu") activeNews.priceMultiplier else 1.0
+    val batteryMult = if (activeNews?.affectedPartId == "battery") activeNews.priceMultiplier else 1.0
+    val caseMult = if (activeNews?.affectedPartId == "case") activeNews.priceMultiplier else 1.0
+
+    val currentCost = (selectedProcessor.baseCost * cpuMult) + selectedCamera.baseCost + (selectedLens.baseCost * lensMult) + 
+                      selectedDesign.baseCost + selectedColor.colorCost + (selectedBattery.baseCost * batteryMult) + 
+                      selectedDisplay.baseCost + selectedTechs.sumOf { it.addedCost } + (30.0 * caseMult)
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         Box(
@@ -179,6 +187,37 @@ fun PhoneCreatorScreen(
                     )
                 }
 
+                if (activeNews != null) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (activeNews.isGoodNews) Color(0xFF064E3B).copy(alpha = 0.5f) else Color(0xFF451A03).copy(alpha = 0.5f))
+                            .border(1.dp, if (activeNews.isGoodNews) Color(0xFF10B981).copy(alpha = 0.3f) else Color(0xFFF59E0B).copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                            .padding(8.dp)
+                    ) {
+                        Column(horizontalAlignment = Alignment.End) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = activeNews.titleAr,
+                                    color = Color.White,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(Icons.Default.Podcasts, contentDescription = null, tint = if (activeNews.isGoodNews) Color(0xFF34D399) else Color(0xFFFBBF24), modifier = Modifier.size(12.dp))
+                            }
+                            Text(
+                                text = "تنبيه: ${activeNews.impactDescAr}",
+                                color = if (activeNews.isGoodNews) Color(0xFF34D399) else Color(0xFFF87171),
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+
                 // Top Tab row indicating the progress stages
                 Row(
                     modifier = Modifier
@@ -194,8 +233,9 @@ fun PhoneCreatorScreen(
                         3 to "المعالج",
                         4 to "البطارية",
                         5 to "الكاميرا",
-                        6 to "النظام",
-                        7 to "الميزات"
+                        6 to "العدسات",
+                        7 to "النظام",
+                        8 to "الميزات"
                     )
 
                     stepsList.forEach { (stepNum, stepTitle) ->
@@ -276,7 +316,7 @@ fun PhoneCreatorScreen(
                                 Spacer(modifier = Modifier.height(4.dp))
                                 OutlinedTextField(
                                     value = phoneName,
-                                    onValueChange = { onSpecsChanged(null, null, null, null, null, null, null, null, it) },
+                                    onValueChange = { onSpecsChanged(null, null, null, null, null, null, null, null, null, it) },
                                     modifier = Modifier.fillMaxWidth().testTag("phone_name_input"),
                                     colors = OutlinedTextFieldDefaults.colors(
                                         focusedTextColor = Color.White,
@@ -333,7 +373,7 @@ fun PhoneCreatorScreen(
                                                 )
                                                 .clickable {
                                                     GameSoundPlayer.playInteractSound()
-                                                    onSpecsChanged(color, null, null, null, null, null, null, null, null)
+                                                    onSpecsChanged(color, null, null, null, null, null, null, null, null, null)
                                                 }
                                                 .testTag("color_option_${color.id}"),
                                             contentAlignment = Alignment.Center
@@ -477,7 +517,7 @@ fun PhoneCreatorScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clickable(enabled = !isLocked) {
-                                            onSpecsChanged(null, null, null, null, null, disp, null, null, null)
+                                            onSpecsChanged(null, null, null, null, null, null, disp, null, null, null)
                                         }
                                         .testTag("display_option_${disp.id}")
                                 ) {
@@ -523,7 +563,7 @@ fun PhoneCreatorScreen(
                                         if (!isLocked) {
                                             RadioButton(
                                                 selected = isSelected,
-                                                onClick = { onSpecsChanged(null, null, null, null, null, disp, null, null, null) },
+                                                onClick = { onSpecsChanged(null, null, null, null, null, null, disp, null, null, null) },
                                                 colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFFFB703), unselectedColor = Color.White.copy(alpha = 0.3f))
                                             )
                                         }
@@ -565,7 +605,7 @@ fun PhoneCreatorScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clickable(enabled = !isLocked) {
-                                            onSpecsChanged(null, null, null, style, null, null, null, null, null)
+                                            onSpecsChanged(null, null, null, null, style, null, null, null, null, null)
                                         }
                                         .testTag("design_option_${style.id}")
                                 ) {
@@ -611,7 +651,7 @@ fun PhoneCreatorScreen(
                                         if (!isLocked) {
                                             RadioButton(
                                                 selected = isSelected,
-                                                onClick = { onSpecsChanged(null, null, null, style, null, null, null, null, null) },
+                                                onClick = { onSpecsChanged(null, null, null, null, style, null, null, null, null, null) },
                                                 colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFFFB703), unselectedColor = Color.White.copy(alpha = 0.3f))
                                             )
                                         }
@@ -656,7 +696,7 @@ fun PhoneCreatorScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clickable(enabled = !isLocked) {
-                                            onSpecsChanged(null, cpu, null, null, null, null, null, null, null)
+                                            onSpecsChanged(null, cpu, null, null, null, null, null, null, null, null)
                                         }
                                         .testTag("processor_option_${cpu.id}")
                                 ) {
@@ -702,7 +742,7 @@ fun PhoneCreatorScreen(
                                         if (!isLocked) {
                                             RadioButton(
                                                 selected = isSelected,
-                                                onClick = { onSpecsChanged(null, cpu, null, null, null, null, null, null, null) },
+                                                onClick = { onSpecsChanged(null, cpu, null, null, null, null, null, null, null, null) },
                                                 colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFFFB703), unselectedColor = Color.White.copy(alpha = 0.3f))
                                             )
                                         }
@@ -747,7 +787,7 @@ fun PhoneCreatorScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clickable(enabled = !isLocked) {
-                                            onSpecsChanged(null, null, null, null, rawBattery, null, null, null, null)
+                                            onSpecsChanged(null, null, null, null, null, rawBattery, null, null, null, null)
                                         }
                                         .testTag("battery_option_${rawBattery.id}")
                                 ) {
@@ -793,7 +833,7 @@ fun PhoneCreatorScreen(
                                         if (!isLocked) {
                                             RadioButton(
                                                 selected = isSelected,
-                                                onClick = { onSpecsChanged(null, null, null, null, rawBattery, null, null, null, null) },
+                                                onClick = { onSpecsChanged(null, null, null, null, null, rawBattery, null, null, null, null) },
                                                 colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFFFB703), unselectedColor = Color.White.copy(alpha = 0.3f))
                                             )
                                         }
@@ -838,7 +878,7 @@ fun PhoneCreatorScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clickable(enabled = !isLocked) {
-                                            onSpecsChangedRaw(null, null, cam, null, null, null, null, null, null, null)
+                                            onSpecsChangedRaw(null, null, cam, null, null, null, null, null, null, null, null)
                                         }
                                         .testTag("camera_option_${cam.id}")
                                 ) {
@@ -884,7 +924,7 @@ fun PhoneCreatorScreen(
                                         if (!isLocked) {
                                             RadioButton(
                                                 selected = isSelected,
-                                                onClick = { onSpecsChangedRaw(null, null, cam, null, null, null, null, null, null, null) },
+                                                onClick = { onSpecsChangedRaw(null, null, cam, null, null, null, null, null, null, null, null) },
                                                 colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFFFB703), unselectedColor = Color.White.copy(alpha = 0.3f))
                                             )
                                         }
@@ -917,7 +957,7 @@ fun PhoneCreatorScreen(
                                         border = BorderStroke(if (isSelected) 1.5.dp else 1.dp, if (isSelected) Color(0xFFFFB703) else Color.White.copy(alpha = 0.1f)),
                                         shape = RoundedCornerShape(8.dp),
                                         modifier = Modifier.weight(1f).clickable {
-                                            onSpecsChangedRaw(null, null, null, null, null, null, null, null, pos, null)
+                                            onSpecsChangedRaw(null, null, null, null, null, null, null, null, null, pos, null)
                                         }
                                     ) {
                                         Box(modifier = Modifier.width(100.dp).padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
@@ -929,6 +969,71 @@ fun PhoneCreatorScreen(
                         }
 
                         6 -> {
+                            // OPTICAL LENS STEP (NEW!)
+                            Text(
+                                text = "اختيار تكنولوجيا العدسات الاحترافية",
+                                color = Color(0xFFFFB703),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.Right
+                            )
+
+                            GameDefaults.LensOptions.forEach { lensOpt ->
+                                val isSelected = lensOpt.id == selectedLens.id
+                                Card(
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (isSelected) Color(0xFFFFB703).copy(alpha = 0.12f) else Color.White.copy(alpha = 0.02f)
+                                    ),
+                                    border = BorderStroke(
+                                        if (isSelected) 1.2.dp else 1.dp,
+                                        if (isSelected) Color(0xFFFFB703) else Color.White.copy(alpha = 0.05f)
+                                    ),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            onSpecsChangedRaw(null, null, null, lensOpt, null, null, null, null, null, null, null)
+                                        }
+                                        .testTag("lens_option_${lensOpt.id}")
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(10.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "+${usdFormatter.format(lensOpt.baseCost)}",
+                                            color = Color(0xFF4AD66D),
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+
+                                        Column(horizontalAlignment = Alignment.End, modifier = Modifier.weight(1f).padding(horizontal = 10.dp)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(text = lensOpt.nameAr, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(text = lensOpt.iconEmoji, fontSize = 14.sp)
+                                            }
+                                            Text(
+                                                text = lensOpt.descAr,
+                                                color = Color.White.copy(alpha = 0.5f),
+                                                fontSize = 10.sp,
+                                                textAlign = TextAlign.Right
+                                            )
+                                        }
+                                        RadioButton(
+                                            selected = isSelected,
+                                            onClick = { onSpecsChangedRaw(null, null, null, lensOpt, null, null, null, null, null, null, null) },
+                                            colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFFFB703), unselectedColor = Color.White.copy(alpha = 0.3f))
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+                        }
+
+                        7 -> {
                             // OPERATING SYSTEM STEP
                             Text(
                                 text = "تثبيت وتخصيص نظام التشغيل",
@@ -962,7 +1067,7 @@ fun PhoneCreatorScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clickable(enabled = !isLocked) {
-                                            onSpecsChanged(null, null, null, null, null, null, os, null, null)
+                                            onSpecsChanged(null, null, null, null, null, null, null, os, null, null)
                                         }
                                         .testTag("os_option_${os.id}")
                                 ) {
@@ -1038,7 +1143,7 @@ fun PhoneCreatorScreen(
                                                 )
                                                 RadioButton(
                                                     selected = isSelected,
-                                                    onClick = { onSpecsChanged(null, null, null, null, null, null, os, null, null) },
+                                                    onClick = { onSpecsChanged(null, null, null, null, null, null, null, os, null, null) },
                                                     colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFFFB703), unselectedColor = Color.White.copy(alpha = 0.3f))
                                                 )
                                             }
@@ -1048,7 +1153,7 @@ fun PhoneCreatorScreen(
                             }
                         }
 
-                        7 -> {
+                        8 -> {
                             // ADDITIONAL TECHS STEP
                             ExtraTechSparePart()
 
@@ -1081,7 +1186,7 @@ fun PhoneCreatorScreen(
                                                 GameSoundPlayer.playUpgradeSuccessSound()
                                                 selectedTechs + tech
                                             }
-                                            onSpecsChanged(null, null, null, null, null, null, null, nextTechs, null)
+                                            onSpecsChanged(null, null, null, null, null, null, null, null, nextTechs, null)
                                         },
                                         label = { 
                                             Text(
@@ -1161,7 +1266,7 @@ fun PhoneCreatorScreen(
                         }
 
                         // Next Step Button
-                        if (currentStep < 7) {
+                        if (currentStep < 8) {
                             Button(
                                 onClick = { currentStep += 1 },
                                 colors = ButtonDefaults.buttonColors(
@@ -1265,7 +1370,7 @@ fun PhoneCreatorScreen(
                         val availableHeight = maxHeight
                         
                         val isFoldable = selectedDesign.id == "futuristic_fold"
-                        val showFrontScreen = currentStep == 2 || currentStep == 6
+                        val showFrontScreen = currentStep == 2 || currentStep == 7
                         
                         // Dynamically scale mockup size to ensure it never overflows parents in landscape
                         val maxPhoneHeight = minOf(230f, (availableHeight * 0.92f).value).dp

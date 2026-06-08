@@ -5,7 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [PlayerProgress::class, CreatedPhone::class], version = 1, exportSchema = false)
+@Database(entities = [PlayerProgress::class, CreatedPhone::class], version = 2, exportSchema = false)
 abstract class GameDatabase : RoomDatabase() {
     abstract fun gameDao(): GameDao
 

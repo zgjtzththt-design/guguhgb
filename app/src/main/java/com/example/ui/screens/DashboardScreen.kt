@@ -39,6 +39,7 @@ import com.example.data.PlayerProgress
 import com.example.game.GameDefaults
 import java.text.NumberFormat
 import java.util.Locale
+import kotlin.math.pow
 
 enum class DashboardPopup {
     NONE,
@@ -46,7 +47,8 @@ enum class DashboardPopup {
     PROFITS,      // Earnings history & statistics
     COMPETITORS,  // Actual market competitor specifications
     WORKERS,      // Employee training & upgrades
-    FACTORY       // Production lines & speed upgrades
+    FACTORY,      // Production lines & speed upgrades
+    NEWS          // Market reports & dynamic pricing studio
 }
 
 @OptIn(ExperimentalAnimationApi::class, ExperimentalMaterial3Api::class)
@@ -58,7 +60,11 @@ fun DashboardScreen(
     onRestartGame: () -> Unit,
     onUpgradeWorker: (workerKey: String, cost: Double) -> Unit,
     onUpgradeFactory: () -> Unit,
-    onUpgradeRD: () -> Unit
+    onUpgradeEfficiency: () -> Unit,
+    onUpgradeMachineSpeed: () -> Unit,
+    onUpgradeRD: () -> Unit,
+    activeNews: com.example.game.NewsItem?,
+    onRefreshNews: () -> Unit
 ) {
     val context = LocalContext.current
     val usdFormatter = NumberFormat.getCurrencyInstance(Locale.US).apply {
@@ -255,6 +261,15 @@ fun DashboardScreen(
                         testTag = "lateral_factory_btn",
                         onClick = { activePopup = DashboardPopup.FACTORY }
                     )
+
+                    // Button 6: News (الأخبار)
+                    LateralCircularButton(
+                        icon = Icons.Default.Newspaper,
+                        label = "الأخبار",
+                        tintColor = Color(0xFFE2E8F0),
+                        testTag = "lateral_news_btn",
+                        onClick = { activePopup = DashboardPopup.NEWS }
+                    )
                 }
 
                 Card(
@@ -364,6 +379,24 @@ fun DashboardScreen(
                                     onClick = { activePopup = DashboardPopup.COMPETITORS }
                                 )
                             }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth().weight(1f),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                // 5. News Studio (Added)
+                                MapBuildingTile(
+                                    modifier = Modifier.weight(1f),
+                                    title = "استديو أخبار السوق العالمي",
+                                    description = "تقارير تقلبات أسعار قطع الغيار وأزمات الشحن",
+                                    statusColor = Color(0xFFE2E8F0),
+                                    isGlowing = true,
+                                    icon = Icons.Default.RecordVoiceOver,
+                                    onClick = { activePopup = DashboardPopup.NEWS }
+                                )
+
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
                         }
 
                         // Map interactive tip
@@ -430,6 +463,7 @@ fun DashboardScreen(
                                 DashboardPopup.COMPETITORS -> "مراقبة وتحليل أجهزة المنافسين"
                                 DashboardPopup.WORKERS -> "تطوير كفاءة وسكن الموظفين"
                                 DashboardPopup.FACTORY -> "تطوير المصنع والبحث العلمي (R&D)"
+                                DashboardPopup.NEWS -> "استديو أخبار السوق التقني"
                                 else -> ""
                             },
                             color = Color.White,
@@ -486,8 +520,16 @@ fun DashboardScreen(
                                     FactoryPopupContent(
                                         progress = progress,
                                         onUpgradeFactory = onUpgradeFactory,
+                                        onUpgradeEfficiency = onUpgradeEfficiency,
+                                        onUpgradeMachineSpeed = onUpgradeMachineSpeed,
                                         onUpgradeRD = onUpgradeRD,
                                         usdFormatter = usdFormatter
+                                    )
+                                }
+                                DashboardPopup.NEWS -> {
+                                    NewsPopupContent(
+                                        activeNews = activeNews,
+                                        onRefreshNews = onRefreshNews
                                     )
                                 }
                                 else -> {}
@@ -1393,162 +1435,273 @@ fun LateralCircularButton(
 }
 
 @Composable
-fun FactoryVisualization(productionSpeedMultiplier: Double) {
+fun FactoryVisualization(
+    productionSpeedMultiplier: Double,
+    onUpgradeFactory: () -> Unit,
+    onUpgradeEfficiency: () -> Unit,
+    onUpgradeMachineSpeed: () -> Unit,
+    canAffordFactory: Boolean,
+    progress: PlayerProgress
+) {
     val infiniteTransition = rememberInfiniteTransition(label = "factory")
+    
+    // Conveyor speed is based on multiplier
+    val cycleTime = (2000.0 / productionSpeedMultiplier).toInt().coerceAtLeast(500)
+    
     val boxProgress by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween((2000.0 / productionSpeedMultiplier).toInt(), easing = LinearEasing),
+            animation = tween(cycleTime, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "box"
     )
 
     val armRotation by infiniteTransition.animateFloat(
-        initialValue = -15f,
-        targetValue = 15f,
+        initialValue = -20f,
+        targetValue = 20f,
         animationSpec = infiniteRepeatable(
-            animation = tween((500.0 / productionSpeedMultiplier).toInt(), easing = FastOutSlowInEasing),
+            animation = tween((cycleTime / 4).coerceAtLeast(150), easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "arm"
     )
 
-    Box(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(200.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(Color(0xFF1E293B))
-            .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
+            .height(220.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Factory Floor Grid
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val step = 20.dp.toPx()
-            for (x in 0..(size.width / step).toInt()) {
-                drawLine(
-                    color = Color.White.copy(alpha = 0.03f),
-                    start = Offset(x * step, 0f),
-                    end = Offset(x * step, size.height),
-                    strokeWidth = 1f
-                )
-            }
-            for (y in 0..(size.height / step).toInt()) {
-                drawLine(
-                    color = Color.White.copy(alpha = 0.03f),
-                    start = Offset(0f, y * step),
-                    end = Offset(size.width, y * step),
-                    strokeWidth = 1f
-                )
-            }
-        }
-
-        // Conveyor Belt
+        // Main Visualization Area
         Box(
             modifier = Modifier
-                .align(Alignment.Center)
-                .fillMaxWidth(0.8f)
-                .height(40.dp)
-                .background(Color(0xFF334155), RoundedCornerShape(4.dp))
-                .border(2.dp, Color(0xFF475569), RoundedCornerShape(4.dp))
+                .weight(1f)
+                .fillMaxHeight()
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color(0xFF0F172A))
+                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
         ) {
-            // Belt texture
+            // Factory Floor Grid
             Canvas(modifier = Modifier.fillMaxSize()) {
-                val segmentWidth = 15.dp.toPx()
-                val offset = (boxProgress * segmentWidth)
-                for (i in -1..(size.width / segmentWidth).toInt() + 1) {
+                val step = 20.dp.toPx()
+                for (x in 0..(size.width / step).toInt()) {
                     drawLine(
-                        color = Color.White.copy(alpha = 0.1f),
-                        start = Offset(i * segmentWidth + offset, 0f),
-                        end = Offset(i * segmentWidth + offset, size.height),
-                        strokeWidth = 2f
+                        color = Color.White.copy(alpha = 0.03f),
+                        start = Offset(x * step, 0f),
+                        end = Offset(x * step, size.height),
+                        strokeWidth = 1f
+                    )
+                }
+                for (y in 0..(size.height / step).toInt()) {
+                    drawLine(
+                        color = Color.White.copy(alpha = 0.03f),
+                        start = Offset(0f, y * step),
+                        end = Offset(size.width, y * step),
+                        strokeWidth = 1f
                     )
                 }
             }
 
-            // Moving Phone Boxes
-            for (i in 0..3) {
-                val individualProgress = (boxProgress + (i * 0.25f)) % 1f
-                Box(
-                    modifier = Modifier
-                        .offset(x = (40 + (individualProgress * 200)).dp, y = 8.dp)
-                        .size(24.dp)
-                        .background(Color(0xFF94A3B8), RoundedCornerShape(4.dp))
-                        .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(4.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Smartphone,
-                        contentDescription = null,
-                        modifier = Modifier.size(14.dp),
-                        tint = Color.White.copy(alpha = 0.5f)
-                    )
-                }
+            // Assembly Point Indicator
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(60.dp)
+                    .background(Color(0xFF1E293B).copy(alpha = 0.5f), CircleShape)
+                    .border(1.dp, Color.White.copy(alpha = 0.05f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(text = "🛠️", fontSize = 24.sp, modifier = Modifier.graphicsLayer(alpha = 0.3f))
             }
-        }
 
-        // Robotic Arm 1 (Working)
-        Box(
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .padding(start = 60.dp, bottom = 40.dp)
-                .graphicsLayer(rotationZ = armRotation)
-                .size(width = 12.dp, height = 50.dp)
-                .background(Color(0xFF64748B), RoundedCornerShape(6.dp))
-        ) {
+            // Component Feeders (Top)
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(40.dp)
+            ) {
+                ComponentPart("🔋", boxProgress)
+                ComponentPart("🔲", (boxProgress + 0.3f) % 1f)
+                ComponentPart("📷", (boxProgress + 0.6f) % 1f)
+            }
+
+            // Primary Conveyor Belt (Bottom)
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .size(16.dp)
-                    .background(Color(0xFF475569), CircleShape)
-            )
-        }
+                    .fillMaxWidth(0.9f)
+                    .padding(bottom = 30.dp)
+                    .height(30.dp)
+                    .background(Color(0xFF334155), RoundedCornerShape(4.dp))
+                    .border(2.dp, Color(0xFF475569), RoundedCornerShape(4.dp))
+            ) {
+                // Belt Moving Texture
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val segmentWidth = 15.dp.toPx()
+                    val offset = (boxProgress * segmentWidth)
+                    for (i in -1..(size.width / segmentWidth).toInt() + 1) {
+                        drawLine(
+                            color = Color.White.copy(alpha = 0.1f),
+                            start = Offset(i * segmentWidth + offset, 0f),
+                            end = Offset(i * segmentWidth + offset, size.height),
+                            strokeWidth = 2f
+                        )
+                    }
+                }
 
-        // Robotic Arm 2 (Quality Check)
-        Box(
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 60.dp, top = 40.dp)
-                .graphicsLayer(rotationZ = -armRotation)
-                .size(width = 10.dp, height = 45.dp)
-                .background(Color(0xFF38BDF8), RoundedCornerShape(4.dp))
-        ) {
+                // Finished Products moving to carton
+                for (i in 0..2) {
+                    val individualProgress = (boxProgress + (i * 0.33f)) % 1f
+                    Box(
+                        modifier = Modifier
+                            .offset(x = (20 + (individualProgress * 180)).dp, y = 4.dp)
+                            .size(22.dp)
+                            .background(Color(0xFF94A3B8), RoundedCornerShape(4.dp))
+                            .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(4.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(imageVector = Icons.Default.Smartphone, contentDescription = null, modifier = Modifier.size(12.dp), tint = Color.White.copy(alpha = 0.5f))
+                    }
+                }
+            }
+
+            // Robotic Assembly Arm
             Box(
                 modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .size(14.dp)
-                    .background(Color(0xFF0EA5E9), CircleShape)
-            )
-        }
+                    .align(Alignment.Center)
+                    .offset(y = (-30).dp)
+                    .graphicsLayer(rotationZ = armRotation, transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0f))
+                    .size(width = 8.dp, height = 60.dp)
+                    .background(
+                        Brush.verticalGradient(listOf(Color(0xFF64748B), Color(0xFF334155))),
+                        RoundedCornerShape(4.dp)
+                    )
+            ) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .size(12.dp)
+                        .background(Color(0xFF475569), CircleShape)
+                        .border(1.dp, Color.White.copy(alpha = 0.2f), CircleShape)
+                )
+            }
 
-        // Packing Station (Carton)
-        Box(
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 10.dp)
-                .size(50.dp)
-                .background(Color(0xFFB45309), RoundedCornerShape(8.dp))
-                .border(2.dp, Color(0xFF92400E), RoundedCornerShape(8.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(text = "📦", fontSize = 24.sp)
-        }
-
-        // Status Indicators
-        Row(
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+            // Packing Carton (Receipt Point)
             Box(
                 modifier = Modifier
-                    .size(8.dp)
-                    .background(Color(0xFF4AD66D), CircleShape)
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 6.dp, bottom = 20.dp)
+                    .size(44.dp)
+                    .background(Color(0xFFB45309), RoundedCornerShape(6.dp))
+                    .border(2.dp, Color(0xFF92400E), RoundedCornerShape(10.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(text = "📦", fontSize = 20.sp)
+                if (boxProgress > 0.9f) {
+                    Text(text = "✨", fontSize = 14.sp, modifier = Modifier.align(Alignment.TopEnd).offset(x = 5.dp, y = (-5).dp))
+                }
+            }
+
+            // Live status tag
+            Box(
+                modifier = Modifier
+                    .padding(10.dp)
+                    .align(Alignment.TopStart)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0xFF4AD66D).copy(alpha = 0.15f))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(6.dp).background(Color(0xFF4AD66D), CircleShape))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(text = "تجميع نشط", color = Color(0xFF4AD66D), fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        // Side Control Buttons Area
+        Column(
+            modifier = Modifier
+                .width(60.dp)
+                .fillMaxHeight(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            FactorySideButton(
+                icon = Icons.Default.PrecisionManufacturing,
+                label = "كفاءة",
+                color = Color(0xFF8D99AE),
+                onClick = onUpgradeEfficiency,
+                enabled = progress.funds >= (GameDefaults.MachineUpgrades.find { it.id == "up_efficiency" }?.baseCost?.times(progress.efficiencyLevel.toDouble().pow(1.6)) ?: 0.0) && progress.efficiencyLevel < 10
             )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(text = "خط الإنتاج النشط", color = Color(0xFF4AD66D), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            
+            FactorySideButton(
+                icon = Icons.Default.ElectricBolt,
+                label = "تسريع",
+                color = Color(0xFFFFB703),
+                onClick = onUpgradeMachineSpeed,
+                enabled = progress.funds >= (GameDefaults.MachineUpgrades.find { it.id == "up_speed" }?.baseCost?.times(progress.machineSpeedLevel.toDouble().pow(1.6)) ?: 0.0) && progress.machineSpeedLevel < 10
+            )
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            // Manual Assembly Clicker
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFF4AD66D).copy(alpha = 0.1f))
+                    .border(1.dp, Color(0xFF4AD66D).copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                    .clickable { /* Fast produce logic if state allowed */ },
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(text = "👆", fontSize = 18.sp)
+                    Text(text = "دفع", color = Color(0xFF4AD66D), fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ComponentPart(emoji: String, progress: Float) {
+    val yOffset = (progress * 50).dp
+    Box(
+        modifier = Modifier
+            .offset(y = yOffset)
+            .size(24.dp)
+            .graphicsLayer(alpha = 1f - (progress * 0.5f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text = emoji, fontSize = 16.sp)
+    }
+}
+
+@Composable
+fun FactorySideButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    color: Color,
+    onClick: () -> Unit,
+    enabled: Boolean
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(54.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (enabled) color.copy(alpha = 0.15f) else Color.White.copy(alpha = 0.05f))
+            .border(1.dp, if (enabled) color.copy(alpha = 0.4f) else Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+            .clickable(enabled = enabled) { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(imageVector = icon, contentDescription = null, tint = if (enabled) color else Color.White.copy(alpha = 0.3f), modifier = Modifier.size(18.dp))
+            Text(text = label, color = if (enabled) Color.White else Color.White.copy(alpha = 0.3f), fontSize = 9.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -1557,6 +1710,8 @@ fun FactoryVisualization(productionSpeedMultiplier: Double) {
 fun FactoryPopupContent(
     progress: com.example.data.PlayerProgress,
     onUpgradeFactory: () -> Unit,
+    onUpgradeEfficiency: () -> Unit,
+    onUpgradeMachineSpeed: () -> Unit,
     onUpgradeRD: () -> Unit,
     usdFormatter: java.text.NumberFormat
 ) {
@@ -1566,9 +1721,22 @@ fun FactoryPopupContent(
     val currentRDLevel = progress.rdLevel
     val rdUpgradeCost = (currentRDLevel * 75000.0)
 
+    val speedUpgrade = GameDefaults.MachineUpgrades.find { it.id == "up_speed" }!!
+    val efficiencyUpgrade = GameDefaults.MachineUpgrades.find { it.id == "up_efficiency" }!!
+
+    val speedCost = speedUpgrade.baseCost * progress.machineSpeedLevel.toDouble().pow(1.6)
+    val efficiencyCost = efficiencyUpgrade.baseCost * progress.efficiencyLevel.toDouble().pow(1.6)
+
     Column(modifier = Modifier.fillMaxSize()) {
         // The Map / Visualization at the Top
-        FactoryVisualization(productionSpeedMultiplier = currentFactory.productionSpeedMultiplier)
+        FactoryVisualization(
+            productionSpeedMultiplier = currentFactory.productionSpeedMultiplier * (1.0 + (progress.machineSpeedLevel - 1) * 0.10),
+            onUpgradeFactory = onUpgradeFactory,
+            onUpgradeEfficiency = onUpgradeEfficiency,
+            onUpgradeMachineSpeed = onUpgradeMachineSpeed,
+            canAffordFactory = nextFactory?.let { progress.funds >= it.upgradeCost } ?: false,
+            progress = progress
+        )
         
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -1600,13 +1768,13 @@ fun FactoryPopupContent(
 
             // Factory Section
             item {
-                Text(text = "خطوط الإنتاج والتصنيع", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Right, modifier = Modifier.fillMaxWidth())
+                Text(text = "خطوط الإنتاج والتصنيع (المصنع الكبير)", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Right, modifier = Modifier.fillMaxWidth())
             }
 
             item {
                 _FactoryUpgradeCard(
                     title = "مستوى المصنع: ${currentFactory.nameAr}",
-                    currentStats = "سرعة الإنتاج: x${currentFactory.productionSpeedMultiplier} • خصم للمواد: -${usdFormatter.format(currentFactory.unitCostReduction)}/وحدة",
+                    currentStats = "سرعة أساسية: x${currentFactory.productionSpeedMultiplier} • خصم للمواد: -${usdFormatter.format(currentFactory.unitCostReduction)}/وحدة",
                     nextStats = nextFactory?.let { "التالي: x${it.productionSpeedMultiplier} سرعة • -${usdFormatter.format(it.unitCostReduction)} خصم" } ?: "تم الوصول لأقصى مستوى",
                     cost = nextFactory?.upgradeCost ?: 0.0,
                     canAfford = nextFactory?.let { progress.funds >= it.upgradeCost } ?: false,
@@ -1615,6 +1783,41 @@ fun FactoryPopupContent(
                     color = Color(0xFF8D99AE),
                     usdFormatter = usdFormatter,
                     onUpgrade = onUpgradeFactory
+                )
+            }
+
+            // Machine Upgrades
+            item {
+                Text(text = "ترقيات الآلات (خط التجميع)", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Right, modifier = Modifier.fillMaxWidth())
+            }
+
+            item {
+                _FactoryUpgradeCard(
+                    title = "سرعة حركة الآلات (Lvl ${progress.machineSpeedLevel})",
+                    currentStats = "زيادة السرعة الحالية: +${(progress.machineSpeedLevel - 1) * 10}%",
+                    nextStats = "التطوير التالي يضيف 10% سرعة تجميع إضافية",
+                    cost = speedCost,
+                    canAfford = progress.funds >= speedCost,
+                    isMaxed = progress.machineSpeedLevel >= speedUpgrade.maxLevel,
+                    icon = Icons.Default.ElectricBolt,
+                    color = Color(0xFFFFB703),
+                    usdFormatter = usdFormatter,
+                    onUpgrade = onUpgradeMachineSpeed
+                )
+            }
+
+            item {
+                _FactoryUpgradeCard(
+                    title = "كفاءة التجميع الذكي (Lvl ${progress.efficiencyLevel})",
+                    currentStats = "خصم إضافي للمواد: -${usdFormatter.format((progress.efficiencyLevel - 1) * 2.5)}/وحدة",
+                    nextStats = "التطوير التالي يقلل هالك المواد ويزيد الربح بكل وحدة",
+                    cost = efficiencyCost,
+                    canAfford = progress.funds >= efficiencyCost,
+                    isMaxed = progress.efficiencyLevel >= efficiencyUpgrade.maxLevel,
+                    icon = Icons.Default.SettingsSuggest,
+                    color = Color(0xFF4AD66D),
+                    usdFormatter = usdFormatter,
+                    onUpgrade = onUpgradeEfficiency
                 )
             }
 
@@ -1638,6 +1841,149 @@ fun FactoryPopupContent(
                 )
             }
         }
+    }
+}
+
+@Composable
+fun NewsPopupContent(
+    activeNews: com.example.game.NewsItem?,
+    onRefreshNews: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // News Studio Header
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(140.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color(0xFF1E293B))
+                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(16.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    imageVector = Icons.Default.RecordVoiceOver,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.7f),
+                    modifier = Modifier.size(40.dp)
+                )
+                Text(
+                    text = "بث مباشر من ستوديو الاقتصاد التقني",
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        if (activeNews != null) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (activeNews.isGoodNews) Color(0xFF064E3B) else Color(0xFF451A03)
+                ),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, if (activeNews.isGoodNews) Color(0xFF10B981) else Color(0xFFF59E0B))
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.End
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (activeNews.isGoodNews) "خبر إيجابي ✅" else "خبر عاجل 🚨",
+                            color = if (activeNews.isGoodNews) Color(0xFF34D399) else Color(0xFFFBBF24),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = activeNews.titleAr,
+                            color = Color.White,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Black,
+                            textAlign = TextAlign.Right
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(
+                        text = activeNews.contentAr,
+                        color = Color.White.copy(alpha = 0.8f),
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Right,
+                        lineHeight = 22.sp,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color.Black.copy(alpha = 0.2f))
+                            .padding(12.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.End,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = activeNews.impactDescAr,
+                                color = if (activeNews.isGoodNews) Color(0xFF34D399) else Color(0xFFF87171),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Right
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Icon(
+                                imageVector = if (activeNews.isGoodNews) Icons.Default.TrendingDown else Icons.Default.TrendingUp,
+                                contentDescription = null,
+                                tint = if (activeNews.isGoodNews) Color(0xFF34D399) else Color(0xFFF87171),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Button(
+            onClick = onRefreshNews,
+            colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.1f)),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(imageVector = Icons.Default.Autorenew, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(text = "تحديث تقرير السوق العالمي", fontSize = 14.sp)
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        Text(
+            text = "تتغير أخبار السوق بشكل دوري عند إطلاق هواتف جديدة أو تحديث البث يدويًا. تابع الأخبار لتقليل تكاليف الإنتاج!",
+            color = Color.White.copy(alpha = 0.4f),
+            fontSize = 11.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 24.dp)
+        )
     }
 }
 

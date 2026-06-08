@@ -13,7 +13,9 @@ data class PlayerProgress(
     val fans: Int = 120, // Brand followers
     val phonesCreatedCount: Int = 0,
     val factoryLevel: Int = 1,
-    val rdLevel: Int = 1
+    val rdLevel: Int = 1,
+    val efficiencyLevel: Int = 1,
+    val machineSpeedLevel: Int = 1
 )
 
 @Entity(tableName = "created_phones")

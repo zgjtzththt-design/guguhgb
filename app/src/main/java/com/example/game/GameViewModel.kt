@@ -27,6 +27,7 @@ sealed interface GameUiState {
         val selectedColor: PhoneColor,
         val selectedProcessor: ProcessorOption,
         val selectedCamera: CameraOption,
+        val selectedLens: LensOption,
         val selectedDesign: DesignStyle,
         val selectedBattery: BatteryOption,
         val selectedDisplay: DisplayOption,
@@ -44,6 +45,7 @@ sealed interface GameUiState {
         val selectedColor: PhoneColor,
         val selectedProcessor: ProcessorOption,
         val selectedCamera: CameraOption,
+        val selectedLens: LensOption,
         val selectedDesign: DesignStyle,
         val selectedBattery: BatteryOption,
         val selectedDisplay: DisplayOption,
@@ -89,9 +91,24 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private var currentPlayerProgress: PlayerProgress? = null
     private var runningHistory: List<CreatedPhone> = emptyList()
 
+    private val _activeNews = MutableStateFlow<NewsItem?>(null)
+    val activeNews: StateFlow<NewsItem?> = _activeNews.asStateFlow()
+
+    fun generateMarketNews() {
+        _activeNews.value = GameDefaults.NewsPool.random()
+    }
+
+    private fun getNewsMultiplier(partId: String): Double {
+        val news = _activeNews.value ?: return 1.0
+        return if (news.affectedPartId == partId) news.priceMultiplier else 1.0
+    }
+
     init {
         val database = GameDatabase.getDatabase(application)
         repository = GameRepository(database.gameDao())
+
+        // Broadcast news studio initial report
+        generateMarketNews()
 
         // Listen for database changes to keep active states synced
         viewModelScope.launch {
@@ -165,6 +182,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             selectedColor = GameDefaults.Colors.first(),
             selectedProcessor = GameDefaults.Processors.first(),
             selectedCamera = GameDefaults.Cameras.first(),
+            selectedLens = GameDefaults.LensOptions.first(),
             selectedDesign = GameDefaults.DesignStyles.first(),
             selectedBattery = GameDefaults.Batteries.first(),
             selectedDisplay = GameDefaults.Displays.first(),
@@ -178,6 +196,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         color: PhoneColor? = null,
         processor: ProcessorOption? = null,
         camera: CameraOption? = null,
+        lens: LensOption? = null,
         design: DesignStyle? = null,
         battery: BatteryOption? = null,
         display: DisplayOption? = null,
@@ -192,6 +211,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 selectedColor = color ?: current.selectedColor,
                 selectedProcessor = processor ?: current.selectedProcessor,
                 selectedCamera = camera ?: current.selectedCamera,
+                selectedLens = lens ?: current.selectedLens,
                 selectedDesign = design ?: current.selectedDesign,
                 selectedBattery = battery ?: current.selectedBattery,
                 selectedDisplay = display ?: current.selectedDisplay,
@@ -211,6 +231,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 selectedColor = current.selectedColor,
                 selectedProcessor = current.selectedProcessor,
                 selectedCamera = current.selectedCamera,
+                selectedLens = current.selectedLens,
                 selectedDesign = current.selectedDesign,
                 selectedBattery = current.selectedBattery,
                 selectedDisplay = current.selectedDisplay,
@@ -238,6 +259,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     selectedColor = current.selectedColor,
                     selectedProcessor = current.selectedProcessor,
                     selectedCamera = current.selectedCamera,
+                    selectedLens = current.selectedLens,
                     selectedDesign = current.selectedDesign,
                     selectedBattery = current.selectedBattery,
                     selectedDisplay = current.selectedDisplay,
@@ -277,6 +299,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 selectedColor = current.selectedColor,
                 selectedProcessor = current.selectedProcessor,
                 selectedCamera = current.selectedCamera,
+                selectedLens = current.selectedLens,
                 selectedDesign = current.selectedDesign,
                 selectedBattery = current.selectedBattery,
                 selectedDisplay = current.selectedDisplay,
@@ -412,7 +435,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         // Total consumer volumes per level challenge requirements
         val factoryLevel = progress.factoryLevel
         val factoryConfig = GameDefaults.FactoryConfigs.firstOrNull { it.level == factoryLevel } ?: GameDefaults.FactoryConfigs.first()
-        val productionSpeedBonus = factoryConfig.productionSpeedMultiplier
+        
+        // Machine Speed Bonus: each level adds +10% speed
+        val machineSpeedBonus = 1.0 + (progress.machineSpeedLevel - 1) * 0.10
+        val productionSpeedBonus = factoryConfig.productionSpeedMultiplier * machineSpeedBonus
 
         val marketVolume = when (challenge.levelNumber) {
             1 -> 16000
@@ -688,6 +714,44 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         return false
     }
 
+    fun upgradeEfficiency() {
+        val progress = currentPlayerProgress ?: return
+        val currentLvl = progress.efficiencyLevel
+        val upgrade = GameDefaults.MachineUpgrades.find { it.id == "up_efficiency" } ?: return
+        if (currentLvl >= upgrade.maxLevel) return
+        
+        val cost = upgrade.baseCost * currentLvl.toDouble().pow(1.6)
+        if (progress.funds >= cost) {
+            GameSoundPlayer.playUpgradeSuccessSound()
+            viewModelScope.launch {
+                val updatedProgress = progress.copy(
+                    funds = progress.funds - cost,
+                    efficiencyLevel = currentLvl + 1
+                )
+                repository.savePlayerProgress(updatedProgress)
+            }
+        }
+    }
+
+    fun upgradeMachineSpeed() {
+        val progress = currentPlayerProgress ?: return
+        val currentLvl = progress.machineSpeedLevel
+        val upgrade = GameDefaults.MachineUpgrades.find { it.id == "up_speed" } ?: return
+        if (currentLvl >= upgrade.maxLevel) return
+        
+        val cost = upgrade.baseCost * currentLvl.toDouble().pow(1.6)
+        if (progress.funds >= cost) {
+            GameSoundPlayer.playUpgradeSuccessSound()
+            viewModelScope.launch {
+                val updatedProgress = progress.copy(
+                    funds = progress.funds - cost,
+                    machineSpeedLevel = currentLvl + 1
+                )
+                repository.savePlayerProgress(updatedProgress)
+            }
+        }
+    }
+
     fun upgradeFactory() {
         val progress = currentPlayerProgress ?: return
         val currentLevel = progress.factoryLevel
@@ -726,6 +790,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         selectedColor: PhoneColor,
         selectedProcessor: ProcessorOption,
         selectedCamera: CameraOption,
+        selectedLens: LensOption,
         selectedDesign: DesignStyle,
         selectedBattery: BatteryOption,
         selectedDisplay: DisplayOption,
@@ -743,15 +808,22 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val cameraLevel = getWorkerLevel("worker_camera_lvl")
         val techLevel = getWorkerLevel("worker_tech_lvl")
 
+        // News Multipliers
+        val cpuMult = getNewsMultiplier("cpu")
+        val lensMult = getNewsMultiplier("lens")
+        val batteryMult = getNewsMultiplier("battery")
+        val caseMult = getNewsMultiplier("case")
+
         // Base specs + worker level boosters (+6.0 per level above 1)
         var performance = selectedProcessor.performanceScore + (perfLevel - 1) * 6.0
-        var cameraPower = selectedCamera.cameraScore + (cameraLevel - 1) * 6.0
+        var cameraPower = selectedCamera.cameraScore + selectedLens.qualityScore + (cameraLevel - 1) * 6.0
         var designScore = selectedDesign.designScore + selectedColor.designBonus + (designLevel - 1) * 6.0
         var techAppeal = selectedBattery.scoreBonus + selectedDisplay.displayScore + selectedOs.uiBonus + (techLevel - 1) * 6.0
 
         // Accumulate feature additions
-        var totalCost = selectedProcessor.baseCost + selectedCamera.baseCost + selectedDesign.baseCost + 
-                        selectedColor.colorCost + selectedBattery.baseCost + selectedDisplay.baseCost + selectedOs.baseCost
+        var totalCost = (selectedProcessor.baseCost * cpuMult) + selectedCamera.baseCost + (selectedLens.baseCost * lensMult) + 
+                        selectedDesign.baseCost + selectedColor.colorCost + (selectedBattery.baseCost * batteryMult) + 
+                        selectedDisplay.baseCost + selectedOs.baseCost + (30.0 * caseMult) // base case cost 30
  
         selectedTechs.forEach { tech ->
             totalCost += tech.addedCost
@@ -762,7 +834,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         // Apply Factory Cost Reduction
-        totalCost = max(5.0, totalCost - factoryConfig.unitCostReduction)
+        val efficiencyBonus = (progress?.efficiencyLevel ?: 1 - 1) * 2.5
+        totalCost = max(5.0, totalCost - (factoryConfig.unitCostReduction + efficiencyBonus))
 
         // Clip maximums
         performance = min(100.0, performance)

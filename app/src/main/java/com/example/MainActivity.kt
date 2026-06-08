@@ -64,8 +64,18 @@ class MainActivity : ComponentActivity() {
                                 onUpgradeFactory = {
                                     viewModel.upgradeFactory()
                                 },
+                                onUpgradeEfficiency = {
+                                    viewModel.upgradeEfficiency()
+                                },
+                                onUpgradeMachineSpeed = {
+                                    viewModel.upgradeMachineSpeed()
+                                },
                                 onUpgradeRD = {
                                     viewModel.upgradeRD()
+                                },
+                                activeNews = viewModel.activeNews.collectAsState().value,
+                                onRefreshNews = {
+                                    viewModel.generateMarketNews()
                                 }
                             )
                         }
@@ -88,6 +98,7 @@ class MainActivity : ComponentActivity() {
                                 selectedColor = state.selectedColor,
                                 selectedProcessor = state.selectedProcessor,
                                 selectedCamera = state.selectedCamera,
+                                selectedLens = state.selectedLens,
                                 selectedDesign = state.selectedDesign,
                                 selectedBattery = state.selectedBattery,
                                 selectedDisplay = state.selectedDisplay,
@@ -95,8 +106,9 @@ class MainActivity : ComponentActivity() {
                                 selectedTechs = state.selectedTechs,
                                 selectedCameraPosition = state.selectedCameraPosition,
                                 phoneName = state.currentPhoneName,
-                                onSpecsChangedRaw = { color, processor, camera, design, battery, display, os, techs, pos, name ->
-                                    viewModel.updateCreatorState(color, processor, camera, design, battery, display, os, techs, pos, name)
+                                activeNews = viewModel.activeNews.collectAsState().value,
+                                onSpecsChangedRaw = { color, processor, camera, lens, design, battery, display, os, techs, pos, name ->
+                                    viewModel.updateCreatorState(color, processor, camera, lens, design, battery, display, os, techs, pos, name)
                                 },
                                 onSubmitSpecs = {
                                     viewModel.advanceToValuation()
@@ -115,6 +127,7 @@ class MainActivity : ComponentActivity() {
                                 selectedColor = state.selectedColor,
                                 selectedProcessor = state.selectedProcessor,
                                 selectedCamera = state.selectedCamera,
+                                selectedLens = state.selectedLens,
                                 selectedDesign = state.selectedDesign,
                                 selectedBattery = state.selectedBattery,
                                 selectedDisplay = state.selectedDisplay,
