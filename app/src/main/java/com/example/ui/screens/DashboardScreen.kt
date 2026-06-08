@@ -345,11 +345,11 @@ fun DashboardScreen(
                                 MapBuildingTile(
                                     modifier = Modifier.weight(1f),
                                     title = "مصنع تجميع الأجهزة",
-                                    description = "${history.size} هاتف تم إطلاقه",
+                                    description = "تطوير الخطوط والإنتاج الفوري",
                                     statusColor = Color(0xFF4AD66D),
-                                    isGlowing = history.isNotEmpty(),
+                                    isGlowing = true,
                                     icon = Icons.Default.Factory,
-                                    onClick = { activePopup = DashboardPopup.PROFITS }
+                                    onClick = { activePopup = DashboardPopup.FACTORY }
                                 )
                             }
 
@@ -384,18 +384,27 @@ fun DashboardScreen(
                                 modifier = Modifier.fillMaxWidth().weight(1f),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                // 5. News Studio (Added)
+                                // 5. News Studio
                                 MapBuildingTile(
                                     modifier = Modifier.weight(1f),
-                                    title = "استديو أخبار السوق العالمي",
-                                    description = "تقارير تقلبات أسعار قطع الغيار وأزمات الشحن",
+                                    title = "استوديو أخبار السوق",
+                                    description = "تقارير الأسعار العالمية",
                                     statusColor = Color(0xFFE2E8F0),
                                     isGlowing = true,
                                     icon = Icons.Default.RecordVoiceOver,
                                     onClick = { activePopup = DashboardPopup.NEWS }
                                 )
 
-                                Spacer(modifier = Modifier.weight(1f))
+                                // 6. Profits & Sales Statistics
+                                MapBuildingTile(
+                                    modifier = Modifier.weight(1f),
+                                    title = "مركز البيانات والأرباح",
+                                    description = "سجل المبيعات والنمو",
+                                    statusColor = Color(0xFF4AD66D),
+                                    isGlowing = history.isNotEmpty(),
+                                    icon = Icons.Default.Analytics,
+                                    onClick = { activePopup = DashboardPopup.PROFITS }
+                                )
                             }
                         }
 
