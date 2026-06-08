@@ -2,7 +2,9 @@ package com.example.ui.screens
 
 import android.widget.Toast
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -21,8 +23,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -1389,6 +1393,167 @@ fun LateralCircularButton(
 }
 
 @Composable
+fun FactoryVisualization(productionSpeedMultiplier: Double) {
+    val infiniteTransition = rememberInfiniteTransition(label = "factory")
+    val boxProgress by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween((2000.0 / productionSpeedMultiplier).toInt(), easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "box"
+    )
+
+    val armRotation by infiniteTransition.animateFloat(
+        initialValue = -15f,
+        targetValue = 15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween((500.0 / productionSpeedMultiplier).toInt(), easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "arm"
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(200.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color(0xFF1E293B))
+            .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
+    ) {
+        // Factory Floor Grid
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val step = 20.dp.toPx()
+            for (x in 0..(size.width / step).toInt()) {
+                drawLine(
+                    color = Color.White.copy(alpha = 0.03f),
+                    start = Offset(x * step, 0f),
+                    end = Offset(x * step, size.height),
+                    strokeWidth = 1f
+                )
+            }
+            for (y in 0..(size.height / step).toInt()) {
+                drawLine(
+                    color = Color.White.copy(alpha = 0.03f),
+                    start = Offset(0f, y * step),
+                    end = Offset(size.width, y * step),
+                    strokeWidth = 1f
+                )
+            }
+        }
+
+        // Conveyor Belt
+        Box(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .fillMaxWidth(0.8f)
+                .height(40.dp)
+                .background(Color(0xFF334155), RoundedCornerShape(4.dp))
+                .border(2.dp, Color(0xFF475569), RoundedCornerShape(4.dp))
+        ) {
+            // Belt texture
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val segmentWidth = 15.dp.toPx()
+                val offset = (boxProgress * segmentWidth)
+                for (i in -1..(size.width / segmentWidth).toInt() + 1) {
+                    drawLine(
+                        color = Color.White.copy(alpha = 0.1f),
+                        start = Offset(i * segmentWidth + offset, 0f),
+                        end = Offset(i * segmentWidth + offset, size.height),
+                        strokeWidth = 2f
+                    )
+                }
+            }
+
+            // Moving Phone Boxes
+            for (i in 0..3) {
+                val individualProgress = (boxProgress + (i * 0.25f)) % 1f
+                Box(
+                    modifier = Modifier
+                        .offset(x = (40 + (individualProgress * 200)).dp, y = 8.dp)
+                        .size(24.dp)
+                        .background(Color(0xFF94A3B8), RoundedCornerShape(4.dp))
+                        .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(4.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Smartphone,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = Color.White.copy(alpha = 0.5f)
+                    )
+                }
+            }
+        }
+
+        // Robotic Arm 1 (Working)
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = 60.dp, bottom = 40.dp)
+                .graphicsLayer(rotationZ = armRotation)
+                .size(width = 12.dp, height = 50.dp)
+                .background(Color(0xFF64748B), RoundedCornerShape(6.dp))
+        ) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .size(16.dp)
+                    .background(Color(0xFF475569), CircleShape)
+            )
+        }
+
+        // Robotic Arm 2 (Quality Check)
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 60.dp, top = 40.dp)
+                .graphicsLayer(rotationZ = -armRotation)
+                .size(width = 10.dp, height = 45.dp)
+                .background(Color(0xFF38BDF8), RoundedCornerShape(4.dp))
+        ) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .size(14.dp)
+                    .background(Color(0xFF0EA5E9), CircleShape)
+            )
+        }
+
+        // Packing Station (Carton)
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 10.dp)
+                .size(50.dp)
+                .background(Color(0xFFB45309), RoundedCornerShape(8.dp))
+                .border(2.dp, Color(0xFF92400E), RoundedCornerShape(8.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(text = "📦", fontSize = 24.sp)
+        }
+
+        // Status Indicators
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .background(Color(0xFF4AD66D), CircleShape)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(text = "خط الإنتاج النشط", color = Color(0xFF4AD66D), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
 fun FactoryPopupContent(
     progress: com.example.data.PlayerProgress,
     onUpgradeFactory: () -> Unit,
@@ -1401,70 +1566,77 @@ fun FactoryPopupContent(
     val currentRDLevel = progress.rdLevel
     val rdUpgradeCost = (currentRDLevel * 75000.0)
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(bottom = 24.dp)
-    ) {
-        item {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF8D99AE).copy(alpha = 0.1f)),
-                border = BorderStroke(1.dp, Color(0xFF8D99AE).copy(alpha = 0.2f)),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.End) {
-                    Text(text = "🏭 إدارة منشآت التصنيع والبحوث", color = Color(0xFF8D99AE), fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    Text(
-                        text = "طور مصنعك لزيادة سرعة الإنتاج وتقليل تكاليف المواد الخام لكل وحدة، واستثمر في R&D لتقليل تكاليف تطوير النماذج الأولية للهواتف.",
-                        color = Color.White.copy(alpha = 0.7f),
-                        fontSize = 11.sp,
-                        lineHeight = 16.sp,
-                        textAlign = TextAlign.Right,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
+    Column(modifier = Modifier.fillMaxSize()) {
+        // The Map / Visualization at the Top
+        FactoryVisualization(productionSpeedMultiplier = currentFactory.productionSpeedMultiplier)
+        
+        Spacer(modifier = Modifier.height(16.dp))
+
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(bottom = 24.dp)
+        ) {
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF8D99AE).copy(alpha = 0.1f)),
+                    border = BorderStroke(1.dp, Color(0xFF8D99AE).copy(alpha = 0.2f)),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.End) {
+                        Text(text = "🏭 إدارة منشآت التصنيع والبحوث", color = Color(0xFF8D99AE), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "طور مصنعك لزيادة سرعة الإنتاج وتقليل تكاليف المواد الخام لكل وحدة، واستثمر في R&D لتقليل تكاليف تطوير النماذج الأولية للهواتف.",
+                            color = Color.White.copy(alpha = 0.7f),
+                            fontSize = 11.sp,
+                            lineHeight = 16.sp,
+                            textAlign = TextAlign.Right,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
                 }
             }
-        }
 
-        // Factory Section
-        item {
-            Text(text = "خطوط الإنتاج والتصنيع", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Right, modifier = Modifier.fillMaxWidth())
-        }
+            // Factory Section
+            item {
+                Text(text = "خطوط الإنتاج والتصنيع", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Right, modifier = Modifier.fillMaxWidth())
+            }
 
-        item {
-            _FactoryUpgradeCard(
-                title = "مستوى المصنع: ${currentFactory.nameAr}",
-                currentStats = "سرعة الإنتاج: x${currentFactory.productionSpeedMultiplier} • خصم للمواد: -${usdFormatter.format(currentFactory.unitCostReduction)}/وحدة",
-                nextStats = nextFactory?.let { "التالي: x${it.productionSpeedMultiplier} سرعة • -${usdFormatter.format(it.unitCostReduction)} خصم" } ?: "تم الوصول لأقصى مستوى",
-                cost = nextFactory?.upgradeCost ?: 0.0,
-                canAfford = nextFactory?.let { progress.funds >= it.upgradeCost } ?: false,
-                isMaxed = nextFactory == null,
-                icon = Icons.Default.PrecisionManufacturing,
-                color = Color(0xFF8D99AE),
-                usdFormatter = usdFormatter,
-                onUpgrade = onUpgradeFactory
-            )
-        }
+            item {
+                _FactoryUpgradeCard(
+                    title = "مستوى المصنع: ${currentFactory.nameAr}",
+                    currentStats = "سرعة الإنتاج: x${currentFactory.productionSpeedMultiplier} • خصم للمواد: -${usdFormatter.format(currentFactory.unitCostReduction)}/وحدة",
+                    nextStats = nextFactory?.let { "التالي: x${it.productionSpeedMultiplier} سرعة • -${usdFormatter.format(it.unitCostReduction)} خصم" } ?: "تم الوصول لأقصى مستوى",
+                    cost = nextFactory?.upgradeCost ?: 0.0,
+                    canAfford = nextFactory?.let { progress.funds >= it.upgradeCost } ?: false,
+                    isMaxed = nextFactory == null,
+                    icon = Icons.Default.PrecisionManufacturing,
+                    color = Color(0xFF8D99AE),
+                    usdFormatter = usdFormatter,
+                    onUpgrade = onUpgradeFactory
+                )
+            }
 
-        // R&D Section
-        item {
-            Text(text = "قسم البحث والتطوير (R&D)", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Right, modifier = Modifier.fillMaxWidth())
-        }
+            // R&D Section
+            item {
+                Text(text = "قسم البحث والتطوير (R&D)", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Right, modifier = Modifier.fillMaxWidth())
+            }
 
-        item {
-            _FactoryUpgradeCard(
-                title = "مستوى البحوث: المستوى $currentRDLevel",
-                currentStats = "تخفيض تكلفة تطوير الهواتف: ${currentRDLevel * 5}%",
-                nextStats = "التالي: ${(currentRDLevel + 1) * 5}% تخفيض لتكاليف النماذج",
-                cost = rdUpgradeCost,
-                canAfford = progress.funds >= rdUpgradeCost,
-                isMaxed = currentRDLevel >= 10,
-                icon = Icons.Default.Science,
-                color = Color(0xFF5CC4FF),
-                usdFormatter = usdFormatter,
-                onUpgrade = onUpgradeRD
-            )
+            item {
+                _FactoryUpgradeCard(
+                    title = "مستوى البحوث: المستوى $currentRDLevel",
+                    currentStats = "تخفيض تكلفة تطوير الهواتف: ${currentRDLevel * 5}%",
+                    nextStats = "التالي: ${(currentRDLevel + 1) * 5}% تخفيض لتكاليف النماذج",
+                    cost = rdUpgradeCost,
+                    canAfford = progress.funds >= rdUpgradeCost,
+                    isMaxed = currentRDLevel >= 10,
+                    icon = Icons.Default.Science,
+                    color = Color(0xFF5CC4FF),
+                    usdFormatter = usdFormatter,
+                    onUpgrade = onUpgradeRD
+                )
+            }
         }
     }
 }
