@@ -38,6 +38,8 @@ fun ValuationScreen(
     selectedCamera: CameraOption,
     selectedDesign: DesignStyle,
     selectedBattery: BatteryOption,
+    selectedDisplay: DisplayOption,
+    selectedOs: OsOption,
     selectedTechs: Set<CustomTechnology>,
     proposedPrice: Double,
     researchTier: Int,
@@ -216,7 +218,10 @@ fun ValuationScreen(
                     Divider(color = Color.White.copy(alpha = 0.06f))
 
                     // Design item Row
-                    SpecItemAr(label = "الشاشة والتصميم", value = selectedDesign.nameAr, priceText = usdFormatter.format(selectedDesign.baseCost))
+                    SpecItemAr(label = "نوع الشاشة والدقة", value = "${selectedDisplay.typeAr} (${selectedDisplay.resolutionAr})", priceText = usdFormatter.format(selectedDisplay.baseCost))
+
+                    // Border style item Row
+                    SpecItemAr(label = "شكل الوجهة والحواف", value = selectedDesign.nameAr, priceText = usdFormatter.format(selectedDesign.baseCost))
 
                     // Processor item Row
                     SpecItemAr(label = "شريحة المعالجة", value = selectedProcessor.nameAr, priceText = usdFormatter.format(selectedProcessor.baseCost))
@@ -226,6 +231,9 @@ fun ValuationScreen(
 
                     // Battery item Row
                     SpecItemAr(label = "مخزون الطاقة والبطارية", value = selectedBattery.nameAr, priceText = usdFormatter.format(selectedBattery.baseCost))
+
+                    // OS item Row
+                    SpecItemAr(label = "نظام التشغيل المثبت", value = selectedOs.nameAr, priceText = usdFormatter.format(selectedOs.baseCost))
 
                     // Color item Row
                     SpecItemAr(label = "خامة ولون الغشاء", value = selectedColor.nameAr, priceText = usdFormatter.format(selectedColor.colorCost))
@@ -589,6 +597,27 @@ fun ValuationScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(text = "سعر البيع المقترح لعامة الجمهور", color = Color.White.copy(alpha = 0.5f), fontSize = 11.sp)
                         Text(text = usdFormatter.format(proposedPrice), color = Color(0xFFFFB703), fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                        
+                        val ratio = proposedPrice / adjustedCostOfGoods
+                        val ratingLabel = when {
+                            ratio < 1.1 -> "قيمة استثنائية (تحدي الربح)"
+                            ratio < 1.3 -> "قيمة ممتازة ⭐"
+                            ratio < 1.6 -> "سعر عادل 👍"
+                            ratio < 2.0 -> "هاتف مرتفع الثمن"
+                            ratio < 3.0 -> "هاتف فاخر (فلاجشيب)"
+                            else -> "سعر مبالغ فيه جداً 💸"
+                        }
+                        Text(
+                            text = ratingLabel,
+                            color = when {
+                                ratio < 1.6 -> Color(0xFF4AD66D)
+                                ratio < 2.5 -> Color(0xFFFFB703)
+                                else -> Color(0xFFEF233C)
+                            },
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
                     }
                 }
             }

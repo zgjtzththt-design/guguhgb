@@ -1,10 +1,14 @@
 package com.example
 
 import android.os.Bundle
+import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
@@ -23,6 +27,11 @@ class MainActivity : ComponentActivity() {
         
         // Supports full-bleed content, including camera notches and bottom nav bars
         enableEdgeToEdge()
+
+        // Implement Immersive Mode (Hide Status Bar and Navigation Bar)
+        val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
+        windowInsetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
 
         setContent {
             MyApplicationTheme {
@@ -51,6 +60,12 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onUpgradeWorker = { workerKey, cost ->
                                     viewModel.upgradeWorker(workerKey, cost)
+                                },
+                                onUpgradeFactory = {
+                                    viewModel.upgradeFactory()
+                                },
+                                onUpgradeRD = {
+                                    viewModel.upgradeRD()
                                 }
                             )
                         }
@@ -75,10 +90,13 @@ class MainActivity : ComponentActivity() {
                                 selectedCamera = state.selectedCamera,
                                 selectedDesign = state.selectedDesign,
                                 selectedBattery = state.selectedBattery,
+                                selectedDisplay = state.selectedDisplay,
+                                selectedOs = state.selectedOs,
                                 selectedTechs = state.selectedTechs,
+                                selectedCameraPosition = state.selectedCameraPosition,
                                 phoneName = state.currentPhoneName,
-                                onSpecsChangedRaw = { color, processor, camera, design, battery, techs, name ->
-                                    viewModel.updateCreatorState(color, processor, camera, design, battery, techs, name)
+                                onSpecsChangedRaw = { color, processor, camera, design, battery, display, os, techs, pos, name ->
+                                    viewModel.updateCreatorState(color, processor, camera, design, battery, display, os, techs, pos, name)
                                 },
                                 onSubmitSpecs = {
                                     viewModel.advanceToValuation()
@@ -99,6 +117,8 @@ class MainActivity : ComponentActivity() {
                                 selectedCamera = state.selectedCamera,
                                 selectedDesign = state.selectedDesign,
                                 selectedBattery = state.selectedBattery,
+                                selectedDisplay = state.selectedDisplay,
+                                selectedOs = state.selectedOs,
                                 selectedTechs = state.selectedTechs,
                                 proposedPrice = state.proposedPrice,
                                 researchTier = state.researchTier,

@@ -20,6 +20,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -30,6 +31,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalContext
+import com.example.R
 import com.example.data.PlayerProgress
 import com.example.game.*
 import java.text.NumberFormat
@@ -45,7 +51,10 @@ fun PhoneCreatorScreen(
     selectedCamera: CameraOption,
     selectedDesign: DesignStyle,
     selectedBattery: BatteryOption,
+    selectedDisplay: DisplayOption,
+    selectedOs: OsOption,
     selectedTechs: Set<CustomTechnology>,
+    selectedCameraPosition: CameraPosition,
     phoneName: String,
     onSpecsChangedRaw: (
         color: PhoneColor?,
@@ -53,17 +62,20 @@ fun PhoneCreatorScreen(
         camera: CameraOption?,
         design: DesignStyle?,
         battery: BatteryOption?,
+        display: DisplayOption?,
+        os: OsOption?,
         techs: Set<CustomTechnology>?,
+        cameraPosition: CameraPosition?,
         name: String?
     ) -> Unit,
     onSubmitSpecs: () -> Unit,
     onCancel: () -> Unit
 ) {
-    val onSpecsChanged = { color: PhoneColor?, processor: ProcessorOption?, camera: CameraOption?, design: DesignStyle?, battery: BatteryOption?, techs: Set<CustomTechnology>?, name: String? ->
+    val onSpecsChanged = { color: PhoneColor?, processor: ProcessorOption?, camera: CameraOption?, design: DesignStyle?, battery: BatteryOption?, display: DisplayOption?, os: OsOption?, techs: Set<CustomTechnology>?, name: String? ->
         if (techs == null) {
             GameSoundPlayer.playInteractSound()
         }
-        onSpecsChangedRaw(color, processor, camera, design, battery, techs, name)
+        onSpecsChangedRaw(color, processor, camera, design, battery, display, os, techs, null, name)
     }
 
     val usdFormatter = NumberFormat.getCurrencyInstance(Locale.US).apply {
@@ -73,9 +85,12 @@ fun PhoneCreatorScreen(
     // Wizard step state: 1: Design, 2: Screen, 3: Processor, 4: Battery, 5: Camera, 6: Extra Techs
     var currentStep by rememberSaveable { mutableStateOf(1) }
     var selectedBodyFrame by rememberSaveable { mutableStateOf("samsung_s25_ultra") }
+    val context = LocalContext.current
 
     // Calculate real-time manufacturing cost
-    val currentCost = selectedProcessor.baseCost + selectedCamera.baseCost + selectedDesign.baseCost + selectedColor.colorCost + selectedBattery.baseCost + selectedTechs.sumOf { it.addedCost }
+    val currentCost = selectedProcessor.baseCost + selectedCamera.baseCost + selectedDesign.baseCost + 
+                      selectedColor.colorCost + selectedBattery.baseCost + selectedDisplay.baseCost + 
+                      selectedTechs.sumOf { it.addedCost }
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         Box(
@@ -144,6 +159,26 @@ fun PhoneCreatorScreen(
                     )
                 }
 
+                // Balance and Level Row
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "المستوى: ${progress.currentLevel}",
+                        color = Color(0xFFFFB703),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "الميزانية: ${usdFormatter.format(progress.funds)}",
+                        color = Color(0xFF4AD66D),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
                 // Top Tab row indicating the progress stages
                 Row(
                     modifier = Modifier
@@ -159,7 +194,8 @@ fun PhoneCreatorScreen(
                         3 to "المعالج",
                         4 to "البطارية",
                         5 to "الكاميرا",
-                        6 to "الميزات"
+                        6 to "النظام",
+                        7 to "الميزات"
                     )
 
                     stepsList.forEach { (stepNum, stepTitle) ->
@@ -240,7 +276,7 @@ fun PhoneCreatorScreen(
                                 Spacer(modifier = Modifier.height(4.dp))
                                 OutlinedTextField(
                                     value = phoneName,
-                                    onValueChange = { onSpecsChanged(null, null, null, null, null, null, it) },
+                                    onValueChange = { onSpecsChanged(null, null, null, null, null, null, null, null, it) },
                                     modifier = Modifier.fillMaxWidth().testTag("phone_name_input"),
                                     colors = OutlinedTextFieldDefaults.colors(
                                         focusedTextColor = Color.White,
@@ -297,7 +333,7 @@ fun PhoneCreatorScreen(
                                                 )
                                                 .clickable {
                                                     GameSoundPlayer.playInteractSound()
-                                                    onSpecsChanged(color, null, null, null, null, null, null)
+                                                    onSpecsChanged(color, null, null, null, null, null, null, null, null)
                                                 }
                                                 .testTag("color_option_${color.id}"),
                                             contentAlignment = Alignment.Center
@@ -336,7 +372,11 @@ fun PhoneCreatorScreen(
 
                                 val bodyFrames = listOf(
                                     Triple("samsung_s25_ultra", "Samsung S25 Ultra", "إطار تيتانيوم مصقول، زوايا حادة قوية للأعمال والإنتاجية."),
-                                    Triple("iphone_17", "iPhone 17 Pro", "زوايا انسيابية مستديرة للغاية، ملمس ناعم كالحرير بحواف متناسقة."),
+                                    Triple("samsung_s25_standard", "Samsung S25 Standard", "تصميم متوازن بزوايا مستديرة مريحة لليد مع إطار ألمنيوم خفيف."),
+                                    Triple("iphone_17_pro", "iPhone 17 Pro", "زوايا انسيابية مستديرة للغاية، ملمس ناعم كالحرير بحواف متناسقة."),
+                                    Triple("iphone_17_standard", "iPhone 17 Standard", "الأناقة الزجاجية المعتادة مع زوايا مريحة وهيكل نحيف للغاية."),
+                                    Triple("nothing_phone_3", "Nothing Phone (3)", "تصميم شفاف أيقوني مع واجهة Glyph الضوئية وهيكل صناعي أنيق."),
+                                    Triple("rog_phone_9", "ROG Phone 9 Ultimate", "تصميم هجومي للألعاب مع زوايا حادة مائلة وشاشة AniMe Matrix خلفية."),
                                     Triple("google_pixel", "هاتِف Google Pixel Pro", "النمط العضوي الدافئ مع شريط مستشعر خلفي أفقي ممتد ومميز جداً."),
                                     Triple("xiaomi_15_ultra", "Xiaomi 15 Ultra", "هيكل سيراميكي متين مزود بحلقة كاميرا دائرية أيقونية عملاقة بالأعلى.")
                                 )
@@ -406,7 +446,95 @@ fun PhoneCreatorScreen(
                             ScreenSparePart(selectedDesign)
 
                             Text(
-                                text = "تحديد تكنولوجيا الشاشة والوجهة العلوية",
+                                text = "تحديد مهارات الشاشة والدقة",
+                                color = Color(0xFFFFB703),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.Right
+                            )
+
+                            GameDefaults.Displays.forEach { disp ->
+                                val isSelected = disp.id == selectedDisplay.id
+                                val isLocked = disp.requiredLevel > progress.currentLevel
+                                Card(
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = when {
+                                            isLocked -> Color.White.copy(alpha = 0.01f)
+                                            isSelected -> Color(0xFFFFB703).copy(alpha = 0.12f)
+                                            else -> Color.White.copy(alpha = 0.02f)
+                                        }
+                                    ),
+                                    border = BorderStroke(
+                                        if (isSelected) 1.2.dp else 1.dp,
+                                        when {
+                                            isLocked -> Color.White.copy(alpha = 0.05f)
+                                            isSelected -> Color(0xFFFFB703)
+                                            else -> Color.White.copy(alpha = 0.05f)
+                                        }
+                                    ),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable(enabled = !isLocked) {
+                                            onSpecsChanged(null, null, null, null, null, disp, null, null, null)
+                                        }
+                                        .testTag("display_option_${disp.id}")
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(10.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        if (isLocked) {
+                                            Icon(
+                                                imageVector = Icons.Default.Lock,
+                                                contentDescription = "Locked",
+                                                tint = Color.White.copy(alpha = 0.2f),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        } else {
+                                            Text(
+                                                text = "+${usdFormatter.format(disp.baseCost)}",
+                                                color = Color(0xFF4AD66D),
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+
+                                        Column(horizontalAlignment = Alignment.End, modifier = Modifier.weight(1f).padding(horizontal = 10.dp)) {
+                                            Text(
+                                                text = if (isLocked) "؟؟؟ (مستوى ${disp.requiredLevel})" else "${disp.typeAr} (${disp.resolutionAr})",
+                                                color = if (isLocked) Color.White.copy(alpha = 0.3f) else Color.White,
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                textAlign = TextAlign.Right
+                                            )
+                                            Text(
+                                                text = if (isLocked) "ارتقِ بمستوى شركتك لفتح هذا المكون المتطور." else disp.techDetailAr,
+                                                color = Color.White.copy(alpha = 0.5f),
+                                                fontSize = 10.sp,
+                                                textAlign = TextAlign.Right
+                                            )
+                                        }
+
+                                        if (!isLocked) {
+                                            RadioButton(
+                                                selected = isSelected,
+                                                onClick = { onSpecsChanged(null, null, null, null, null, disp, null, null, null) },
+                                                colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFFFB703), unselectedColor = Color.White.copy(alpha = 0.3f))
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            Text(
+                                text = "تحديد تكنولوجيا الحواف والوجهة العلوية",
                                 color = Color(0xFFFFB703),
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
@@ -416,19 +544,28 @@ fun PhoneCreatorScreen(
 
                             GameDefaults.DesignStyles.forEach { style ->
                                 val isSelected = style.id == selectedDesign.id
+                                val isLocked = style.requiredLevel > progress.currentLevel
                                 Card(
                                     colors = CardDefaults.cardColors(
-                                        containerColor = if (isSelected) Color(0xFFFFB703).copy(alpha = 0.12f) else Color.White.copy(alpha = 0.02f)
+                                        containerColor = when {
+                                            isLocked -> Color.White.copy(alpha = 0.01f)
+                                            isSelected -> Color(0xFFFFB703).copy(alpha = 0.12f)
+                                            else -> Color.White.copy(alpha = 0.02f)
+                                        }
                                     ),
                                     border = BorderStroke(
                                         if (isSelected) 1.2.dp else 1.dp,
-                                        if (isSelected) Color(0xFFFFB703) else Color.White.copy(alpha = 0.05f)
+                                        when {
+                                            isLocked -> Color.White.copy(alpha = 0.05f)
+                                            isSelected -> Color(0xFFFFB703)
+                                            else -> Color.White.copy(alpha = 0.05f)
+                                        }
                                     ),
                                     shape = RoundedCornerShape(10.dp),
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clickable {
-                                            onSpecsChanged(null, null, null, style, null, null, null)
+                                        .clickable(enabled = !isLocked) {
+                                            onSpecsChanged(null, null, null, style, null, null, null, null, null)
                                         }
                                         .testTag("design_option_${style.id}")
                                 ) {
@@ -439,34 +576,45 @@ fun PhoneCreatorScreen(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(
-                                            text = "+${usdFormatter.format(style.baseCost)}",
-                                            color = Color(0xFF4AD66D),
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
+                                        if (isLocked) {
+                                            Icon(
+                                                imageVector = Icons.Default.Lock,
+                                                contentDescription = "Locked",
+                                                tint = Color.White.copy(alpha = 0.2f),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        } else {
+                                            Text(
+                                                text = "+${usdFormatter.format(style.baseCost)}",
+                                                color = Color(0xFF4AD66D),
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
 
                                         Column(horizontalAlignment = Alignment.End, modifier = Modifier.weight(1f).padding(horizontal = 10.dp)) {
                                             Text(
-                                                text = style.nameAr,
-                                                color = Color.White,
+                                                text = if (isLocked) "؟؟؟ (مستوى ${style.requiredLevel})" else style.nameAr,
+                                                color = if (isLocked) Color.White.copy(alpha = 0.3f) else Color.White,
                                                 fontSize = 13.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 textAlign = TextAlign.Right
                                             )
                                             Text(
-                                                text = style.techDetailAr,
+                                                text = if (isLocked) "يفتح هذا التصميم المستقبلي عند الوصول للمستوى المطلوب." else style.techDetailAr,
                                                 color = Color.White.copy(alpha = 0.5f),
                                                 fontSize = 10.sp,
                                                 textAlign = TextAlign.Right
                                             )
                                         }
 
-                                        RadioButton(
-                                            selected = isSelected,
-                                            onClick = { onSpecsChanged(null, null, null, style, null, null, null) },
-                                            colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFFFB703), unselectedColor = Color.White.copy(alpha = 0.3f))
-                                        )
+                                        if (!isLocked) {
+                                            RadioButton(
+                                                selected = isSelected,
+                                                onClick = { onSpecsChanged(null, null, null, style, null, null, null, null, null) },
+                                                colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFFFB703), unselectedColor = Color.White.copy(alpha = 0.3f))
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -487,19 +635,28 @@ fun PhoneCreatorScreen(
 
                             GameDefaults.Processors.forEach { cpu ->
                                 val isSelected = cpu.id == selectedProcessor.id
+                                val isLocked = cpu.requiredLevel > progress.currentLevel
                                 Card(
                                     colors = CardDefaults.cardColors(
-                                        containerColor = if (isSelected) Color(0xFFFFB703).copy(alpha = 0.12f) else Color.White.copy(alpha = 0.02f)
+                                        containerColor = when {
+                                            isLocked -> Color.White.copy(alpha = 0.01f)
+                                            isSelected -> Color(0xFFFFB703).copy(alpha = 0.12f)
+                                            else -> Color.White.copy(alpha = 0.02f)
+                                        }
                                     ),
                                     border = BorderStroke(
                                         if (isSelected) 1.2.dp else 1.dp,
-                                        if (isSelected) Color(0xFFFFB703) else Color.White.copy(alpha = 0.05f)
+                                        when {
+                                            isLocked -> Color.White.copy(alpha = 0.05f)
+                                            isSelected -> Color(0xFFFFB703)
+                                            else -> Color.White.copy(alpha = 0.05f)
+                                        }
                                     ),
                                     shape = RoundedCornerShape(10.dp),
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clickable {
-                                            onSpecsChanged(null, cpu, null, null, null, null, null)
+                                        .clickable(enabled = !isLocked) {
+                                            onSpecsChanged(null, cpu, null, null, null, null, null, null, null)
                                         }
                                         .testTag("processor_option_${cpu.id}")
                                 ) {
@@ -510,34 +667,45 @@ fun PhoneCreatorScreen(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(
-                                            text = "+${usdFormatter.format(cpu.baseCost)}",
-                                            color = Color(0xFF4AD66D),
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
+                                        if (isLocked) {
+                                            Icon(
+                                                imageVector = Icons.Default.Lock,
+                                                contentDescription = "Locked",
+                                                tint = Color.White.copy(alpha = 0.2f),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        } else {
+                                            Text(
+                                                text = "+${usdFormatter.format(cpu.baseCost)}",
+                                                color = Color(0xFF4AD66D),
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
 
                                         Column(horizontalAlignment = Alignment.End, modifier = Modifier.weight(1f).padding(horizontal = 10.dp)) {
                                             Text(
-                                                text = cpu.nameAr,
-                                                color = Color.White,
+                                                text = if (isLocked) "؟؟؟ (مستوى ${cpu.requiredLevel})" else cpu.nameAr,
+                                                color = if (isLocked) Color.White.copy(alpha = 0.3f) else Color.White,
                                                 fontSize = 13.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 textAlign = TextAlign.Right
                                             )
                                             Text(
-                                                text = cpu.techDetailAr,
+                                                text = if (isLocked) "هذا المعالج الجبار متاح لشركات المستوى المتقدم فقط." else cpu.techDetailAr,
                                                 color = Color.White.copy(alpha = 0.5f),
                                                 fontSize = 10.sp,
                                                 textAlign = TextAlign.Right
                                             )
                                         }
 
-                                        RadioButton(
-                                            selected = isSelected,
-                                            onClick = { onSpecsChanged(null, cpu, null, null, null, null, null) },
-                                            colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFFFB703), unselectedColor = Color.White.copy(alpha = 0.3f))
-                                        )
+                                        if (!isLocked) {
+                                            RadioButton(
+                                                selected = isSelected,
+                                                onClick = { onSpecsChanged(null, cpu, null, null, null, null, null, null, null) },
+                                                colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFFFB703), unselectedColor = Color.White.copy(alpha = 0.3f))
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -558,19 +726,28 @@ fun PhoneCreatorScreen(
 
                             GameDefaults.Batteries.forEach { rawBattery ->
                                 val isSelected = rawBattery.id == selectedBattery.id
+                                val isLocked = rawBattery.requiredLevel > progress.currentLevel
                                 Card(
                                     colors = CardDefaults.cardColors(
-                                        containerColor = if (isSelected) Color(0xFFFFB703).copy(alpha = 0.12f) else Color.White.copy(alpha = 0.02f)
+                                        containerColor = when {
+                                            isLocked -> Color.White.copy(alpha = 0.01f)
+                                            isSelected -> Color(0xFFFFB703).copy(alpha = 0.12f)
+                                            else -> Color.White.copy(alpha = 0.02f)
+                                        }
                                     ),
                                     border = BorderStroke(
                                         if (isSelected) 1.2.dp else 1.dp,
-                                        if (isSelected) Color(0xFFFFB703) else Color.White.copy(alpha = 0.05f)
+                                        when {
+                                            isLocked -> Color.White.copy(alpha = 0.05f)
+                                            isSelected -> Color(0xFFFFB703)
+                                            else -> Color.White.copy(alpha = 0.05f)
+                                        }
                                     ),
                                     shape = RoundedCornerShape(10.dp),
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clickable {
-                                            onSpecsChanged(null, null, null, null, rawBattery, null, null)
+                                        .clickable(enabled = !isLocked) {
+                                            onSpecsChanged(null, null, null, null, rawBattery, null, null, null, null)
                                         }
                                         .testTag("battery_option_${rawBattery.id}")
                                 ) {
@@ -581,34 +758,45 @@ fun PhoneCreatorScreen(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(
-                                            text = "+${usdFormatter.format(rawBattery.baseCost)}",
-                                            color = Color(0xFF4AD66D),
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
+                                        if (isLocked) {
+                                            Icon(
+                                                imageVector = Icons.Default.Lock,
+                                                contentDescription = "Locked",
+                                                tint = Color.White.copy(alpha = 0.2f),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        } else {
+                                            Text(
+                                                text = "+${usdFormatter.format(rawBattery.baseCost)}",
+                                                color = Color(0xFF4AD66D),
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
 
                                         Column(horizontalAlignment = Alignment.End, modifier = Modifier.weight(1f).padding(horizontal = 10.dp)) {
                                             Text(
-                                                text = "${rawBattery.nameAr} (${rawBattery.capacityMah}mAh)",
-                                                color = Color.White,
+                                                text = if (isLocked) "؟؟؟ (مستوى ${rawBattery.requiredLevel})" else "${rawBattery.nameAr} (${rawBattery.capacityMah}mAh)",
+                                                color = if (isLocked) Color.White.copy(alpha = 0.3f) else Color.White,
                                                 fontSize = 13.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 textAlign = TextAlign.Right
                                             )
                                             Text(
-                                                text = rawBattery.descAr,
+                                                text = if (isLocked) "خوارزميات إدارة الطاقة المتقدمة لم تكتشف بعد." else rawBattery.descAr,
                                                 color = Color.White.copy(alpha = 0.5f),
                                                 fontSize = 10.sp,
                                                 textAlign = TextAlign.Right
                                             )
                                         }
 
-                                        RadioButton(
-                                            selected = isSelected,
-                                            onClick = { onSpecsChanged(null, null, null, null, rawBattery, null, null) },
-                                            colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFFFB703), unselectedColor = Color.White.copy(alpha = 0.3f))
-                                        )
+                                        if (!isLocked) {
+                                            RadioButton(
+                                                selected = isSelected,
+                                                onClick = { onSpecsChanged(null, null, null, null, rawBattery, null, null, null, null) },
+                                                colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFFFB703), unselectedColor = Color.White.copy(alpha = 0.3f))
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -629,19 +817,28 @@ fun PhoneCreatorScreen(
 
                             GameDefaults.Cameras.forEach { cam ->
                                 val isSelected = cam.id == selectedCamera.id
+                                val isLocked = cam.requiredLevel > progress.currentLevel
                                 Card(
                                     colors = CardDefaults.cardColors(
-                                        containerColor = if (isSelected) Color(0xFFFFB703).copy(alpha = 0.12f) else Color.White.copy(alpha = 0.02f)
+                                        containerColor = when {
+                                            isLocked -> Color.White.copy(alpha = 0.01f)
+                                            isSelected -> Color(0xFFFFB703).copy(alpha = 0.12f)
+                                            else -> Color.White.copy(alpha = 0.02f)
+                                        }
                                     ),
                                     border = BorderStroke(
                                         if (isSelected) 1.2.dp else 1.dp,
-                                        if (isSelected) Color(0xFFFFB703) else Color.White.copy(alpha = 0.05f)
+                                        when {
+                                            isLocked -> Color.White.copy(alpha = 0.05f)
+                                            isSelected -> Color(0xFFFFB703)
+                                            else -> Color.White.copy(alpha = 0.05f)
+                                        }
                                     ),
                                     shape = RoundedCornerShape(10.dp),
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clickable {
-                                            onSpecsChanged(null, null, cam, null, null, null, null)
+                                        .clickable(enabled = !isLocked) {
+                                            onSpecsChangedRaw(null, null, cam, null, null, null, null, null, null, null)
                                         }
                                         .testTag("camera_option_${cam.id}")
                                 ) {
@@ -652,40 +849,206 @@ fun PhoneCreatorScreen(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(
-                                            text = "+${usdFormatter.format(cam.baseCost)}",
-                                            color = Color(0xFF4AD66D),
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
+                                        if (isLocked) {
+                                            Icon(
+                                                imageVector = Icons.Default.Lock,
+                                                contentDescription = "Locked",
+                                                tint = Color.White.copy(alpha = 0.2f),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        } else {
+                                            Text(
+                                                text = "+${usdFormatter.format(cam.baseCost)}",
+                                                color = Color(0xFF4AD66D),
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
 
                                         Column(horizontalAlignment = Alignment.End, modifier = Modifier.weight(1f).padding(horizontal = 10.dp)) {
                                             Text(
-                                                text = cam.nameAr,
-                                                color = Color.White,
+                                                text = if (isLocked) "؟؟؟ (مستوى ${cam.requiredLevel})" else cam.nameAr,
+                                                color = if (isLocked) Color.White.copy(alpha = 0.3f) else Color.White,
                                                 fontSize = 13.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 textAlign = TextAlign.Right
                                             )
                                             Text(
-                                                text = cam.megapixelsTextAr,
+                                                text = if (isLocked) "هذه التكنولوجيا البصرية متاحة فقط للمصورين المحترفين." else cam.megapixelsTextAr,
                                                 color = Color.White.copy(alpha = 0.5f),
                                                 fontSize = 10.sp,
                                                 textAlign = TextAlign.Right
                                             )
                                         }
 
-                                        RadioButton(
-                                            selected = isSelected,
-                                            onClick = { onSpecsChanged(null, null, cam, null, null, null, null) },
-                                            colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFFFB703), unselectedColor = Color.White.copy(alpha = 0.3f))
-                                        )
+                                        if (!isLocked) {
+                                            RadioButton(
+                                                selected = isSelected,
+                                                onClick = { onSpecsChangedRaw(null, null, cam, null, null, null, null, null, null, null) },
+                                                colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFFFB703), unselectedColor = Color.White.copy(alpha = 0.3f))
+                                            )
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "موضع الكاميرا الخلفية",
+                                color = Color(0xFFFFB703),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.Right
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                CameraPosition.entries.forEach { pos ->
+                                    val isSelected = pos == selectedCameraPosition
+                                    Card(
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = if (isSelected) Color(0xFFFFB703).copy(alpha = 0.2f) else Color.White.copy(alpha = 0.05f)
+                                        ),
+                                        border = BorderStroke(if (isSelected) 1.5.dp else 1.dp, if (isSelected) Color(0xFFFFB703) else Color.White.copy(alpha = 0.1f)),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.weight(1f).clickable {
+                                            onSpecsChangedRaw(null, null, null, null, null, null, null, null, pos, null)
+                                        }
+                                    ) {
+                                        Box(modifier = Modifier.width(100.dp).padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
+                                            Text(text = pos.nameAr, color = if (isSelected) Color(0xFFFFB703) else Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        }
                                     }
                                 }
                             }
                         }
 
                         6 -> {
+                            // OPERATING SYSTEM STEP
+                            Text(
+                                text = "تثبيت وتخصيص نظام التشغيل",
+                                color = Color(0xFFFFB703),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.Right
+                            )
+
+                            GameDefaults.OperatingSystems.forEach { os ->
+                                val isSelected = os.id == selectedOs.id
+                                val isLocked = os.requiredLevel > progress.currentLevel
+                                Card(
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = when {
+                                            isLocked -> Color.White.copy(alpha = 0.01f)
+                                            isSelected -> Color(0xFFFFB703).copy(alpha = 0.12f)
+                                            else -> Color.White.copy(alpha = 0.02f)
+                                        }
+                                    ),
+                                    border = BorderStroke(
+                                        if (isSelected) 1.2.dp else 1.dp,
+                                        when {
+                                            isLocked -> Color.White.copy(alpha = 0.05f)
+                                            isSelected -> Color(0xFFFFB703)
+                                            else -> Color.White.copy(alpha = 0.05f)
+                                        }
+                                    ),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable(enabled = !isLocked) {
+                                            onSpecsChanged(null, null, null, null, null, null, os, null, null)
+                                        }
+                                        .testTag("os_option_${os.id}")
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        // LOGO SECTION
+                                        Box(
+                                            modifier = Modifier
+                                                .size(48.dp)
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(if (isLocked) Color.White.copy(alpha = 0.05f) else Color(android.graphics.Color.parseColor(os.themeColor)).copy(alpha = 0.15f)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            if (isLocked) {
+                                                Icon(Icons.Default.Lock, contentDescription = null, tint = Color.White.copy(alpha = 0.2f), modifier = Modifier.size(20.dp))
+                                            } else {
+                                                val logoResId = context.resources.getIdentifier(os.logoName, "drawable", context.packageName)
+                                                if (logoResId != 0) {
+                                                    Image(
+                                                        painter = painterResource(id = logoResId),
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(32.dp)
+                                                    )
+                                                } else {
+                                                    // Fallback icon based on OS type
+                                                    Icon(
+                                                        imageVector = when(os.id) {
+                                                            "os_basic" -> Icons.Default.Android
+                                                            "os_fruit" -> Icons.Default.PhoneIphone
+                                                            "os_custom" -> Icons.Default.AutoFixHigh
+                                                            else -> Icons.Default.Settings
+                                                        },
+                                                        contentDescription = null,
+                                                        tint = Color(android.graphics.Color.parseColor(os.themeColor)),
+                                                        modifier = Modifier.size(28.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.width(12.dp))
+
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = if (isLocked) "؟؟؟ (مستوى ${os.requiredLevel})" else os.nameAr,
+                                                color = if (isLocked) Color.White.copy(alpha = 0.3f) else Color.White,
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                textAlign = TextAlign.Right,
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                            Text(
+                                                text = if (isLocked) "رخص استخدام هذا النظام متاحة فقط للشركات الكبرى." else os.shortDescAr,
+                                                color = Color.White.copy(alpha = 0.5f),
+                                                fontSize = 11.sp,
+                                                textAlign = TextAlign.Right,
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                        }
+
+                                        if (!isLocked) {
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Column(horizontalAlignment = Alignment.End) {
+                                                Text(
+                                                    text = "+${usdFormatter.format(os.baseCost)}",
+                                                    color = Color(0xFF4AD66D),
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                                RadioButton(
+                                                    selected = isSelected,
+                                                    onClick = { onSpecsChanged(null, null, null, null, null, null, os, null, null) },
+                                                    colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFFFB703), unselectedColor = Color.White.copy(alpha = 0.3f))
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        7 -> {
                             // ADDITIONAL TECHS STEP
                             ExtraTechSparePart()
 
@@ -705,9 +1068,12 @@ fun PhoneCreatorScreen(
                             ) {
                                 GameDefaults.Technologies.forEach { tech ->
                                     val isChecked = selectedTechs.any { it.id == tech.id }
+                                    val isLocked = tech.requiredLevel > progress.currentLevel
+                                    
                                     FilterChip(
                                         selected = isChecked,
                                         onClick = {
+                                            if (isLocked) return@FilterChip
                                             val nextTechs = if (isChecked) {
                                                 GameSoundPlayer.playInteractSound()
                                                 selectedTechs.filterNot { it.id == tech.id }.toSet()
@@ -715,21 +1081,33 @@ fun PhoneCreatorScreen(
                                                 GameSoundPlayer.playUpgradeSuccessSound()
                                                 selectedTechs + tech
                                             }
-                                            onSpecsChanged(null, null, null, null, null, nextTechs, null)
+                                            onSpecsChanged(null, null, null, null, null, null, null, nextTechs, null)
                                         },
-                                        label = { Text(text = tech.nameAr, fontSize = 11.sp, fontWeight = FontWeight.Bold) },
-                                        leadingIcon = if (isChecked) {
-                                            { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(12.dp)) }
+                                        label = { 
+                                            Text(
+                                                text = if (isLocked) "🔒 مستوى ${tech.requiredLevel}" else tech.nameAr, 
+                                                fontSize = 10.sp, 
+                                                fontWeight = FontWeight.Bold
+                                            ) 
+                                        },
+                                        leadingIcon = if (isChecked && !isLocked) {
+                                            { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(10.dp)) }
                                         } else null,
                                         colors = FilterChipDefaults.filterChipColors(
                                             selectedContainerColor = Color(0xFFFFB703).copy(alpha = 0.25f),
                                             selectedLabelColor = Color(0xFFFFB703),
                                             selectedLeadingIconColor = Color(0xFFFFB703),
-                                            containerColor = Color.White.copy(alpha = 0.03f),
-                                            labelColor = Color.White.copy(alpha = 0.7f)
+                                            containerColor = if (isLocked) Color.White.copy(alpha = 0.01f) else Color.White.copy(alpha = 0.03f),
+                                            labelColor = if (isLocked) Color.White.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.7f)
                                         ),
                                         shape = RoundedCornerShape(8.dp),
-                                        modifier = Modifier.testTag("tech_badge_${tech.id}")
+                                        modifier = Modifier.testTag("tech_badge_${tech.id}"),
+                                        border = FilterChipDefaults.filterChipBorder(
+                                            borderColor = if (isLocked) Color.Transparent else Color.White.copy(alpha = 0.1f),
+                                            selectedBorderColor = Color(0xFFFFB703),
+                                            enabled = !isLocked,
+                                            selected = isChecked
+                                        )
                                     )
                                 }
                             }
@@ -740,83 +1118,89 @@ fun PhoneCreatorScreen(
                 Spacer(modifier = Modifier.height(10.dp))
 
                 // Bottom Action button Row for left customizer pane
+                val totalCost = selectedProcessor.baseCost + selectedCamera.baseCost + selectedDesign.baseCost + 
+                                selectedColor.colorCost + selectedBattery.baseCost + selectedDisplay.baseCost + 
+                                selectedTechs.sumOf { it.addedCost }
+                val devCost = totalCost * 500.0
+                val canAfford = progress.funds >= devCost
+
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Previous Step Button
-                    if (currentStep > 1) {
-                        Button(
-                            onClick = { currentStep -= 1 },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color.White.copy(alpha = 0.08f),
-                                contentColor = Color.White
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(text = "السابق", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    } else {
-                        // Close button
-                        Button(
-                            onClick = onCancel,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFFEF233C).copy(alpha = 0.15f),
-                                contentColor = Color(0xFFEF233C)
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
-                        ) {
-                            Text(text = "إلغاء التعديل", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
+                    Column(horizontalAlignment = Alignment.Start) {
+                        Text(text = "تكلفة النموذج", color = Color.White.copy(alpha = 0.4f), fontSize = 9.sp)
+                        Text(
+                            text = usdFormatter.format(devCost), 
+                            color = if (canAfford) Color(0xFF4AD66D) else Color(0xFFEF4444), 
+                            fontSize = 13.sp, 
+                            fontWeight = FontWeight.Bold
+                        )
                     }
 
-                    // Next Step Button
-                    if (currentStep < 6) {
-                        Button(
-                            onClick = { currentStep += 1 },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFFFFB703),
-                                contentColor = Color(0xFF0F172A)
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(text = "الخطوة التالية", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(16.dp))
-                            }
-                        }
-                    } else {
-                        // Finish & Submit button!
-                        Button(
-                            onClick = {
-                                if (phoneName.isNotBlank()) {
-                                    onSubmitSpecs()
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Previous Step Button
+                        if (currentStep > 1) {
+                            Button(
+                                onClick = { currentStep -= 1 },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color.White.copy(alpha = 0.08f),
+                                    contentColor = Color.White
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(text = "السابق", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                 }
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF4AD66D),
-                                contentColor = Color(0xFF020617),
-                                disabledContainerColor = Color.White.copy(alpha = 0.1f),
-                                disabledContentColor = Color.White.copy(alpha = 0.3f)
-                            ),
-                            enabled = phoneName.isNotBlank(),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                            modifier = Modifier.testTag("pricing_stage_button")
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.MonetizationOn, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(text = "طرح وسعر البيع", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+
+                        // Next Step Button
+                        if (currentStep < 7) {
+                            Button(
+                                onClick = { currentStep += 1 },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFFFFB703),
+                                    contentColor = Color(0xFF0F172A)
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(text = "الخطوة التالية", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        } else {
+                            // Finish & Submit button!
+                            Button(
+                                onClick = {
+                                    if (phoneName.isNotBlank() && canAfford) {
+                                        onSubmitSpecs()
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFF4AD66D),
+                                    contentColor = Color(0xFF020617),
+                                    disabledContainerColor = Color.White.copy(alpha = 0.1f),
+                                    disabledContentColor = Color.White.copy(alpha = 0.3f)
+                                ),
+                                enabled = phoneName.isNotBlank() && canAfford,
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                                modifier = Modifier.testTag("pricing_stage_button")
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.MonetizationOn, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(text = "طرح وسعر البيع", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
                             }
                         }
                     }
@@ -881,7 +1265,7 @@ fun PhoneCreatorScreen(
                         val availableHeight = maxHeight
                         
                         val isFoldable = selectedDesign.id == "futuristic_fold"
-                        val showFrontScreen = currentStep == 2
+                        val showFrontScreen = currentStep == 2 || currentStep == 6
                         
                         // Dynamically scale mockup size to ensure it never overflows parents in landscape
                         val maxPhoneHeight = minOf(230f, (availableHeight * 0.92f).value).dp
@@ -906,7 +1290,10 @@ fun PhoneCreatorScreen(
                             } else {
                                 when (selectedBodyFrame) {
                                     "samsung_s25_ultra" -> RoundedCornerShape(4.dp) // Very sharp!
-                                    "iphone_17" -> RoundedCornerShape(26.dp)       // Highly rounded!
+                                    "samsung_s25_standard" -> RoundedCornerShape(16.dp) // Balanced
+                                    "iphone_17_pro", "iphone_17_standard" -> RoundedCornerShape(26.dp) // Highly rounded!
+                                    "nothing_phone_3" -> RoundedCornerShape(24.dp) // Industrial roundness
+                                    "rog_phone_9" -> RoundedCornerShape(8.dp) // Aggressive cut
                                     "google_pixel" -> RoundedCornerShape(18.dp)    // Organic roundness!
                                     "xiaomi_15_ultra" -> RoundedCornerShape(14.dp)  // Premium curves!
                                     else -> RoundedCornerShape(16.dp)
@@ -949,6 +1336,24 @@ fun PhoneCreatorScreen(
                                         ),
                                     contentAlignment = Alignment.TopCenter
                                 ) {
+                                    // SHOW OS LOGO INSTEAD OF WALLPAPER IMAGE
+                                    val logoResId = context.resources.getIdentifier(selectedOs.logoName, "drawable", context.packageName)
+                                    if (logoResId != 0) {
+                                        Box(
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Image(
+                                                painter = painterResource(id = logoResId),
+                                                contentDescription = null,
+                                                modifier = Modifier
+                                                    .size(64.dp)
+                                                    .alpha(0.8f),
+                                                contentScale = ContentScale.Fit
+                                            )
+                                        }
+                                    }
+
                                     // Elegant abstract grid or shine overlay inside screen
                                     Box(
                                         modifier = Modifier
@@ -1135,21 +1540,27 @@ fun PhoneCreatorScreen(
                                     val lensColor = Color(0xFF000000)
                                     val reflectionColor = Color(0xFF5CC4FF)
                                     
+                                    val alignment = when (selectedCameraPosition) {
+                                        CameraPosition.LEFT -> Alignment.TopStart
+                                        CameraPosition.CENTER -> Alignment.TopCenter
+                                        CameraPosition.RIGHT -> Alignment.TopEnd
+                                    }
+
                                     when (selectedBodyFrame) {
-                                        "samsung_s25_ultra" -> {
-                                            // Vertical Stack of individual lens protrusions (Top Left)
+                                        "samsung_s25_ultra", "samsung_s25_standard" -> {
+                                            // Vertical Stack of individual lens protrusions
                                             Column(
                                                 modifier = Modifier
-                                                    .align(Alignment.TopStart)
-                                                    .padding(top = 4.dp, start = 4.dp),
-                                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                                                    .align(alignment)
+                                                    .padding(top = 6.dp, start = if (selectedCameraPosition == CameraPosition.LEFT) 6.dp else 0.dp, end = if (selectedCameraPosition == CameraPosition.RIGHT) 6.dp else 0.dp),
+                                                verticalArrangement = Arrangement.spacedBy(5.dp),
                                                 horizontalAlignment = Alignment.CenterHorizontally
                                             ) {
                                                 val count = when (selectedCamera.id) {
                                                     "single_basic" -> 1
                                                     "dual_advanced" -> 2
                                                     "triple_pro" -> 3
-                                                    "quantum_lens" -> 4
+                                                    "quantum_lens" -> if (selectedBodyFrame == "samsung_s25_ultra") 4 else 3
                                                     else -> 3
                                                 }
                                                 repeat(count) { i ->
@@ -1174,7 +1585,7 @@ fun PhoneCreatorScreen(
                                             }
                                         }
 
-                                        "iphone_17" -> {
+                                        "iphone_17_pro" -> {
                                             // Pro Stove-pot Rounded Triangular Camera Plate
                                             Box(
                                                 modifier = Modifier
@@ -1209,10 +1620,97 @@ fun PhoneCreatorScreen(
                                                         
                                                         if (lenses == 3) {
                                                             Box(
-                                                                modifier = Modifier.padding(3.dp).size(13.dp).clip(CircleShape).background(lensColor).align(Alignment.TopEnd),
+                                                                 modifier = Modifier.padding(3.dp).size(13.dp).clip(CircleShape).background(lensColor).align(Alignment.TopEnd),
                                                                 contentAlignment = Alignment.Center
                                                             ) { Box(modifier = Modifier.size(3.dp).clip(CircleShape).background(reflectionColor)) }
                                                         }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        "iphone_17_standard" -> {
+                                            // Classic Dual Diagonal Camera Layout
+                                            Box(
+                                                modifier = Modifier
+                                                    .align(Alignment.TopStart)
+                                                    .padding(top = 4.dp, start = 4.dp)
+                                                    .size(36.dp)
+                                                    .clip(RoundedCornerShape(10.dp))
+                                                    .background(Color.White.copy(alpha = 0.1f))
+                                                    .border(0.8.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(10.dp)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Box(modifier = Modifier.fillMaxSize()) {
+                                                    // Lens 1 (Top Right)
+                                                    Box(
+                                                        modifier = Modifier.padding(4.dp).size(12.dp).clip(CircleShape).background(lensColor).align(Alignment.TopEnd),
+                                                        contentAlignment = Alignment.Center
+                                                    ) { Box(modifier = Modifier.size(3.5.dp).clip(CircleShape).background(reflectionColor)) }
+
+                                                    // Lens 2 (Bottom Left)
+                                                    Box(
+                                                        modifier = Modifier.padding(4.dp).size(12.dp).clip(CircleShape).background(lensColor).align(Alignment.BottomStart),
+                                                        contentAlignment = Alignment.Center
+                                                    ) { Box(modifier = Modifier.size(3.5.dp).clip(CircleShape).background(reflectionColor)) }
+
+                                                    // Flash (Top Left)
+                                                    Box(
+                                                        modifier = Modifier.padding(4.dp).size(4.dp).clip(CircleShape).background(Color.White).align(Alignment.TopStart)
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        "nothing_phone_3" -> {
+                                            // Nothing Style: Dual Vertical Lenses + Glyph Accents
+                                            Box(
+                                                modifier = Modifier
+                                                    .align(Alignment.TopStart)
+                                                    .padding(top = 8.dp, start = 8.dp)
+                                                    .width(22.dp)
+                                                    .fillMaxHeight(0.35f)
+                                                    .clip(RoundedCornerShape(11.dp))
+                                                    .background(Color.White.copy(alpha = 0.05f))
+                                                    .border(0.5.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(11.dp))
+                                            ) {
+                                                Column(
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    verticalArrangement = Arrangement.SpaceEvenly,
+                                                    horizontalAlignment = Alignment.CenterHorizontally
+                                                ) {
+                                                    repeat(2) {
+                                                        Box(
+                                                            modifier = Modifier.size(14.dp).clip(CircleShape).background(lensColor),
+                                                            contentAlignment = Alignment.Center
+                                                        ) { Box(modifier = Modifier.size(4.dp).clip(CircleShape).background(reflectionColor)) }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        "rog_phone_9" -> {
+                                            // ROG Gaming: Hexagonal/Aggressive Camera Island
+                                            Box(
+                                                modifier = Modifier
+                                                    .align(Alignment.TopStart)
+                                                    .padding(top = 6.dp, start = 2.dp)
+                                                    .size(width = 44.dp, height = 30.dp)
+                                                    .clip(RoundedCornerShape(topStart = 0.dp, topEnd = 8.dp, bottomEnd = 0.dp, bottomStart = 8.dp))
+                                                    .background(Color.Black.copy(alpha = 0.4f))
+                                                    .border(1.dp, Color(0xFFFF2B51).copy(alpha = 0.3f), RoundedCornerShape(bottomStart = 8.dp, topEnd = 8.dp)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp),
+                                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    repeat(3) {
+                                                        Box(
+                                                            modifier = Modifier.size(10.dp).clip(CircleShape).background(lensColor),
+                                                            contentAlignment = Alignment.Center
+                                                        ) { Box(modifier = Modifier.size(3.dp).clip(CircleShape).background(reflectionColor)) }
                                                     }
                                                 }
                                             }

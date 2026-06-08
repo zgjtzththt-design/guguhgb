@@ -41,7 +41,8 @@ enum class DashboardPopup {
     NEW_PHONE,    // Level select & new phone planner
     PROFITS,      // Earnings history & statistics
     COMPETITORS,  // Actual market competitor specifications
-    WORKERS       // Employee training & upgrades
+    WORKERS,      // Employee training & upgrades
+    FACTORY       // Production lines & speed upgrades
 }
 
 @OptIn(ExperimentalAnimationApi::class, ExperimentalMaterial3Api::class)
@@ -51,7 +52,9 @@ fun DashboardScreen(
     history: List<CreatedPhone>,
     onSelectLevel: (levelNum: Int) -> Unit,
     onRestartGame: () -> Unit,
-    onUpgradeWorker: (workerKey: String, cost: Double) -> Unit
+    onUpgradeWorker: (workerKey: String, cost: Double) -> Unit,
+    onUpgradeFactory: () -> Unit,
+    onUpgradeRD: () -> Unit
 ) {
     val context = LocalContext.current
     val usdFormatter = NumberFormat.getCurrencyInstance(Locale.US).apply {
@@ -239,6 +242,15 @@ fun DashboardScreen(
                         testTag = "lateral_workers_btn",
                         onClick = { activePopup = DashboardPopup.WORKERS }
                     )
+
+                    // Button 5: Factory (المصنع)
+                    LateralCircularButton(
+                        icon = Icons.Default.PrecisionManufacturing,
+                        label = "المصنع",
+                        tintColor = Color(0xFF8D99AE),
+                        testTag = "lateral_factory_btn",
+                        onClick = { activePopup = DashboardPopup.FACTORY }
+                    )
                 }
 
                 Card(
@@ -413,6 +425,7 @@ fun DashboardScreen(
                                 DashboardPopup.PROFITS -> "الأرباح والأجهزة المطروحة"
                                 DashboardPopup.COMPETITORS -> "مراقبة وتحليل أجهزة المنافسين"
                                 DashboardPopup.WORKERS -> "تطوير كفاءة وسكن الموظفين"
+                                DashboardPopup.FACTORY -> "تطوير المصنع والبحث العلمي (R&D)"
                                 else -> ""
                             },
                             color = Color.White,
@@ -463,6 +476,14 @@ fun DashboardScreen(
                                         onUpgradeWorker = onUpgradeWorker,
                                         usdFormatter = usdFormatter,
                                         onRefresh = { upgradeCounter++ }
+                                    )
+                                }
+                                DashboardPopup.FACTORY -> {
+                                    FactoryPopupContent(
+                                        progress = progress,
+                                        onUpgradeFactory = onUpgradeFactory,
+                                        onUpgradeRD = onUpgradeRD,
+                                        usdFormatter = usdFormatter
                                     )
                                 }
                                 else -> {}
@@ -1364,6 +1385,157 @@ fun LateralCircularButton(
             maxLines = 1,
             textAlign = TextAlign.Center
         )
+    }
+}
+
+@Composable
+fun FactoryPopupContent(
+    progress: com.example.data.PlayerProgress,
+    onUpgradeFactory: () -> Unit,
+    onUpgradeRD: () -> Unit,
+    usdFormatter: java.text.NumberFormat
+) {
+    val currentFactory = GameDefaults.FactoryConfigs.firstOrNull { it.level == progress.factoryLevel } ?: GameDefaults.FactoryConfigs[0]
+    val nextFactory = GameDefaults.FactoryConfigs.getOrNull(progress.factoryLevel) // index is level for 0-based
+    
+    val currentRDLevel = progress.rdLevel
+    val rdUpgradeCost = (currentRDLevel * 75000.0)
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = PaddingValues(bottom = 24.dp)
+    ) {
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF8D99AE).copy(alpha = 0.1f)),
+                border = BorderStroke(1.dp, Color(0xFF8D99AE).copy(alpha = 0.2f)),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.End) {
+                    Text(text = "🏭 إدارة منشآت التصنيع والبحوث", color = Color(0xFF8D99AE), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = "طور مصنعك لزيادة سرعة الإنتاج وتقليل تكاليف المواد الخام لكل وحدة، واستثمر في R&D لتقليل تكاليف تطوير النماذج الأولية للهواتف.",
+                        color = Color.White.copy(alpha = 0.7f),
+                        fontSize = 11.sp,
+                        lineHeight = 16.sp,
+                        textAlign = TextAlign.Right,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+            }
+        }
+
+        // Factory Section
+        item {
+            Text(text = "خطوط الإنتاج والتصنيع", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Right, modifier = Modifier.fillMaxWidth())
+        }
+
+        item {
+            _FactoryUpgradeCard(
+                title = "مستوى المصنع: ${currentFactory.nameAr}",
+                currentStats = "سرعة الإنتاج: x${currentFactory.productionSpeedMultiplier} • خصم للمواد: -${usdFormatter.format(currentFactory.unitCostReduction)}/وحدة",
+                nextStats = nextFactory?.let { "التالي: x${it.productionSpeedMultiplier} سرعة • -${usdFormatter.format(it.unitCostReduction)} خصم" } ?: "تم الوصول لأقصى مستوى",
+                cost = nextFactory?.upgradeCost ?: 0.0,
+                canAfford = nextFactory?.let { progress.funds >= it.upgradeCost } ?: false,
+                isMaxed = nextFactory == null,
+                icon = Icons.Default.PrecisionManufacturing,
+                color = Color(0xFF8D99AE),
+                usdFormatter = usdFormatter,
+                onUpgrade = onUpgradeFactory
+            )
+        }
+
+        // R&D Section
+        item {
+            Text(text = "قسم البحث والتطوير (R&D)", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Right, modifier = Modifier.fillMaxWidth())
+        }
+
+        item {
+            _FactoryUpgradeCard(
+                title = "مستوى البحوث: المستوى $currentRDLevel",
+                currentStats = "تخفيض تكلفة تطوير الهواتف: ${currentRDLevel * 5}%",
+                nextStats = "التالي: ${(currentRDLevel + 1) * 5}% تخفيض لتكاليف النماذج",
+                cost = rdUpgradeCost,
+                canAfford = progress.funds >= rdUpgradeCost,
+                isMaxed = currentRDLevel >= 10,
+                icon = Icons.Default.Science,
+                color = Color(0xFF5CC4FF),
+                usdFormatter = usdFormatter,
+                onUpgrade = onUpgradeRD
+            )
+        }
+    }
+}
+
+@Composable
+fun _FactoryUpgradeCard(
+    title: String,
+    currentStats: String,
+    nextStats: String,
+    cost: Double,
+    canAfford: Boolean,
+    isMaxed: Boolean,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    color: Color,
+    usdFormatter: java.text.NumberFormat,
+    onUpgrade: () -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.05f)),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f)),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(color.copy(alpha = 0.15f)), contentAlignment = Alignment.Center) {
+                    Icon(imageVector = icon, contentDescription = null, tint = color, modifier = Modifier.size(22.dp))
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(text = title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text(text = currentStats, color = color.copy(alpha = 0.8f), fontSize = 10.sp)
+                }
+            }
+            
+            Divider(modifier = Modifier.padding(vertical = 12.dp), color = Color.White.copy(alpha = 0.05f))
+            
+            Text(text = nextStats, color = Color.White.copy(alpha = 0.5f), fontSize = 11.sp, textAlign = TextAlign.Right, modifier = Modifier.fillMaxWidth())
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            if (!isMaxed) {
+                Button(
+                    onClick = onUpgrade,
+                    enabled = canAfford,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = color,
+                        contentColor = Color(0xFF0F172A),
+                        disabledContainerColor = Color.White.copy(alpha = 0.1f)
+                    ),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text(text = "تطوير الآن (${usdFormatter.format(cost)})", fontWeight = FontWeight.Bold)
+                }
+            } else {
+                Surface(
+                    color = Color.White.copy(alpha = 0.1f),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "وصلت لأقصى تطوير متاح",
+                        color = Color.White.copy(alpha = 0.4f),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(vertical = 10.dp)
+                    )
+                }
+            }
+        }
     }
 }
 

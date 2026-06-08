@@ -11,7 +11,9 @@ data class PlayerProgress(
     val funds: Double = 1000000.0, // Pre-seeded starting budget
     val currentLevel: Int = 1, // Progressing from Level 1 to 4+
     val fans: Int = 120, // Brand followers
-    val phonesCreatedCount: Int = 0
+    val phonesCreatedCount: Int = 0,
+    val factoryLevel: Int = 1,
+    val rdLevel: Int = 1
 )
 
 @Entity(tableName = "created_phones")

@@ -29,7 +29,10 @@ sealed interface GameUiState {
         val selectedCamera: CameraOption,
         val selectedDesign: DesignStyle,
         val selectedBattery: BatteryOption,
+        val selectedDisplay: DisplayOption,
+        val selectedOs: OsOption,
         val selectedTechs: Set<CustomTechnology>,
+        val selectedCameraPosition: CameraPosition = CameraPosition.LEFT,
         val currentPhoneName: String
     ) : GameUiState
 
@@ -43,7 +46,10 @@ sealed interface GameUiState {
         val selectedCamera: CameraOption,
         val selectedDesign: DesignStyle,
         val selectedBattery: BatteryOption,
+        val selectedDisplay: DisplayOption,
+        val selectedOs: OsOption,
         val selectedTechs: Set<CustomTechnology>,
+        val selectedCameraPosition: CameraPosition = CameraPosition.LEFT,
         val proposedPrice: Double,
         val researchTier: Int = 1, // 0 = Basic, 1 = Standard, 2 = Advanced
         val manufacturingQuality: Int = 1, // 0 = Economy, 1 = Standard, 2 = Premium
@@ -161,6 +167,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             selectedCamera = GameDefaults.Cameras.first(),
             selectedDesign = GameDefaults.DesignStyles.first(),
             selectedBattery = GameDefaults.Batteries.first(),
+            selectedDisplay = GameDefaults.Displays.first(),
+            selectedOs = GameDefaults.OperatingSystems.first(),
             selectedTechs = emptySet(),
             currentPhoneName = "نوفا ${progress.phonesCreatedCount + 1}"
         )
@@ -172,7 +180,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         camera: CameraOption? = null,
         design: DesignStyle? = null,
         battery: BatteryOption? = null,
+        display: DisplayOption? = null,
+        os: OsOption? = null,
         techs: Set<CustomTechnology>? = null,
+        cameraPosition: CameraPosition? = null,
         name: String? = null
     ) {
         val current = _uiState.value
@@ -183,7 +194,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 selectedCamera = camera ?: current.selectedCamera,
                 selectedDesign = design ?: current.selectedDesign,
                 selectedBattery = battery ?: current.selectedBattery,
+                selectedDisplay = display ?: current.selectedDisplay,
+                selectedOs = os ?: current.selectedOs,
                 selectedTechs = techs ?: current.selectedTechs,
+                selectedCameraPosition = cameraPosition ?: current.selectedCameraPosition,
                 currentPhoneName = name ?: current.currentPhoneName
             )
         }
@@ -199,22 +213,40 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 selectedCamera = current.selectedCamera,
                 selectedDesign = current.selectedDesign,
                 selectedBattery = current.selectedBattery,
-                selectedTechs = current.selectedTechs
+                selectedDisplay = current.selectedDisplay,
+                selectedOs = current.selectedOs,
+                selectedTechs = current.selectedTechs,
+                cameraPosition = current.selectedCameraPosition
             )
 
-            _uiState.value = GameUiState.Valuation(
-                progress = current.progress,
-                challenge = current.challenge,
-                stats = stats,
-                phoneName = current.currentPhoneName,
-                selectedColor = current.selectedColor,
-                selectedProcessor = current.selectedProcessor,
-                selectedCamera = current.selectedCamera,
-                selectedDesign = current.selectedDesign,
-                selectedBattery = current.selectedBattery,
-                selectedTechs = current.selectedTechs,
-                proposedPrice = (stats.manufacturingCost * 1.5).roundToInt().toDouble() // default 50% premium
-            )
+            // Deduct Development Cost (e.g., 500 units manufacturing worth)
+            // RD level reduces this cost: 1 = full, 2 = 95%, 3 = 90%, etc.
+            val rdReduction = 1.0 - (current.progress.rdLevel - 1) * 0.05
+            val devCost = (stats.manufacturingCost * 500.0 * rdReduction).coerceAtLeast(100.0)
+            
+            if (current.progress.funds < devCost) return 
+
+            viewModelScope.launch {
+                val updatedProgress = current.progress.copy(funds = current.progress.funds - devCost)
+                repository.savePlayerProgress(updatedProgress)
+
+                _uiState.value = GameUiState.Valuation(
+                    progress = updatedProgress,
+                    challenge = current.challenge,
+                    stats = stats,
+                    phoneName = current.currentPhoneName,
+                    selectedColor = current.selectedColor,
+                    selectedProcessor = current.selectedProcessor,
+                    selectedCamera = current.selectedCamera,
+                    selectedDesign = current.selectedDesign,
+                    selectedBattery = current.selectedBattery,
+                    selectedDisplay = current.selectedDisplay,
+                    selectedOs = current.selectedOs,
+                    selectedTechs = current.selectedTechs,
+                    selectedCameraPosition = current.selectedCameraPosition,
+                    proposedPrice = (stats.manufacturingCost * 1.5).roundToInt().toDouble() // default 50% premium
+                )
+            }
         }
     }
 
@@ -247,6 +279,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 selectedCamera = current.selectedCamera,
                 selectedDesign = current.selectedDesign,
                 selectedBattery = current.selectedBattery,
+                selectedDisplay = current.selectedDisplay,
+                selectedOs = current.selectedOs,
                 selectedTechs = current.selectedTechs,
                 currentPhoneName = current.phoneName
             )
@@ -332,24 +366,39 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
         // 2. Compute Segment-specific consumer utility for each phone
         val basePlayerUtility = calculatePhoneUtility(pPerf, pCam, pDsn, pTech, pPrice, challenge.idealFocus)
-        val playerUtility = basePlayerUtility * overallUtilityMultiplier
+        
+        // Cohesion and Optimization checks
+        var cohesionMultiplier = 1.0
+        val cpuScore = current.selectedProcessor.performanceScore
+        val osId = current.selectedOs.id
+        
+        if (osId == "os_fruit" && cpuScore < 40.0) {
+            cohesionMultiplier = 0.82 // Heavy OS on weak CPU penalty
+        } else if (osId == "os_basic" && cpuScore > 75.0) {
+            cohesionMultiplier = 1.08 // Light OS on power CPU bonus
+        } else if (osId == "os_custom" && cpuScore > 50.0) {
+            cohesionMultiplier = 1.04 // Balanced performance
+        }
+
+        val playerUtility = basePlayerUtility * overallUtilityMultiplier * cohesionMultiplier
         val comp1Utility = calculatePhoneUtility(c1Perf, c1Cam, c1Dsn, c1Tech, c1Price, challenge.idealFocus)
         val comp2Utility = calculatePhoneUtility(c2Perf, c2Cam, c2Dsn, c2Tech, c2Price, challenge.idealFocus)
 
         // 3. Apply Brand reputation / fan base factor to utility to derive attraction
         // Player's brand power goes up with fan density
-        val playerBrandMultiplier = 0.85 + (progress.fans.toDouble() / 2500.0).coerceAtMost(0.75)
+        val playerBrandMultiplier = 0.92 + (progress.fans.toDouble() / 40000.0).coerceAtMost(0.68)
         // Competitors are established giants in their respectively targeted levels
         val comp1BrandMultiplier = 1.15
         val comp2BrandMultiplier = 1.30
-
+        
         val mktAttractionMultiplier = when (current.marketingCampaign) {
-            0 -> 0.70
+            0 -> 0.72
             1 -> 1.0
-            2 -> 1.35
-            3 -> 1.80
+            2 -> 1.38
+            3 -> 1.85
             else -> 1.0
         }
+        
         val playerAttraction = max(1.0, playerUtility * playerBrandMultiplier * mktAttractionMultiplier)
         val comp1Attraction = max(1.0, comp1Utility * comp1BrandMultiplier)
         val comp2Attraction = max(1.0, comp2Utility * comp2BrandMultiplier)
@@ -361,6 +410,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val comp2Share = comp2Attraction / totalAttraction
 
         // Total consumer volumes per level challenge requirements
+        val factoryLevel = progress.factoryLevel
+        val factoryConfig = GameDefaults.FactoryConfigs.firstOrNull { it.level == factoryLevel } ?: GameDefaults.FactoryConfigs.first()
+        val productionSpeedBonus = factoryConfig.productionSpeedMultiplier
+
         val marketVolume = when (challenge.levelNumber) {
             1 -> 16000
             2 -> 34000
@@ -371,7 +424,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
         // Apply a small organic variance (+-10%) to units sold to feel natural
         val randomFactor = 0.9 + (Math.random() * 0.2)
-        val unitsSoldRaw = (marketVolume * playerShare * randomFactor).roundToInt()
+        val unitsSoldRaw = (marketVolume * playerShare * randomFactor * productionSpeedBonus).roundToInt()
         val unitsSold = max(120, unitsSoldRaw) // guaranteed baseline for effort
 
         val comp1Units = max(100, (marketVolume * comp1Share * (0.9 + Math.random() * 0.2)).roundToInt())
@@ -426,6 +479,20 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             reviews.add("جودة الصور مخيبة للآمال، تمنيت لو كانت الكاميرا بقوة عدسة ${compStats2.phoneName}. 🌑")
         }
 
+        // Compare OS
+        when (current.selectedOs.id) {
+            "os_fruit" -> reviews.add("نظام التشغيل الفاخر أعطى الهاتف طابعاً حصرياً وجاذبية كبيرة لمحبي الأناقة والسهولة. 🍎✨")
+            "os_custom" -> reviews.add("واجهة نوفا مرنة جداً، أعشق إمكانيات التخصيص التي لا تنتهي في هذا الهاتف. 🎨📱")
+            "os_basic" -> reviews.add("النظام الخام سريع جداً وبسيط، يذكرني بالسرعة التي فقدتها في الهواتف المليئة بالتطبيقات الزائدة. ⚡🤖")
+        }
+
+        // Compare Design
+        if (pDsn > 85.0) {
+            reviews.add("تصميم الهاتف فني لدرجة مبهرة، أشعر أنني أحمل قطعة من المستقبل بين يديني. 🌌💎")
+        } else if (pDsn < 35.0) {
+            reviews.add("تصميم الهاتف يبدو قديماً ومملّاً، كان بالإمكان أفضل مما كان بكثير. 🏚️")
+        }
+
         // Additional specifications commentary
         if (current.selectedTechs.contains(GameDefaults.Technologies.firstOrNull { it.id == "tech_titanium" })) {
             reviews.add("الهيكل التيتانيومي رائع وقوي، يعطي إحساساً بالأمان والصلابة عند الإمساك به. 💎")
@@ -467,11 +534,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         )
 
         // 8. Challenge parameters evaluation
-        val profitGoalMet = netProfit >= challenge.requiredNetProfit
         val unitsGoalMet = unitsSold >= challenge.requiredUnitsSold
+        // While we track these for the UI, the level-up trigger will now follow the user's focus on sales
+        val profitGoalMet = netProfit >= challenge.requiredNetProfit
         val ratingMet = formattedRating >= challenge.ratingRequirement
 
-        val isLevelBeaten = profitGoalMet && unitsGoalMet && ratingMet
+        val isLevelBeaten = unitsGoalMet // User specifically asked for sales trigger
 
         // 9. Persist update records asynchronously
         viewModelScope.launch {
@@ -496,7 +564,13 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 else -> 1.0
             }
             val addedFansFactor = formattedRating / challenge.ratingRequirement
-            val addedFans = (unitsSold * addedFansFactor * 0.05 * mktFansMultiplier).roundToInt()
+            // Base growth from rating
+            var addedFansBase = (unitsSold * addedFansFactor * 0.05 * mktFansMultiplier)
+            
+            // Bonus growth if exceeded quality expectations
+            if (formattedRating > 4.5) addedFansBase *= 1.3
+            
+            val addedFans = addedFansBase.roundToInt()
             val newFans = progress.fans + max(5, addedFans)
 
             val updatedProgress = progress.copy(
@@ -557,7 +631,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 else if (price >= 250.0) 5.0
                 else ((250.0 - price) / 180.0) * 100.0
 
-                val specsScore = (performance * 0.4 + camera * 0.3 + design * 0.2 + technology * 0.1)
+                val specsScore = (performance * 0.3 + camera * 0.2 + design * 0.3 + technology * 0.2)
                 (priceUtility * 0.70) + (specsScore * 0.30)
             }
             "BALANCED" -> {
@@ -565,7 +639,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 else if (price >= 500.0) 5.0
                 else ((500.0 - price) / 350.0) * 100.0
 
-                val specPart = performance * 0.25 + camera * 0.20 + design * 0.10 + technology * 0.10
+                val specPart = performance * 0.2 + camera * 0.2 + design * 0.3 + technology * 0.3
                 (priceUtility * 0.35) + (specPart * 0.65)
             }
             "CAMERA" -> {
@@ -573,7 +647,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 else if (price >= 1400.0) 5.0
                 else ((1400.0 - price) / 900.0) * 100.0
 
-                val specPart = camera * 0.50 + performance * 0.15 + design * 0.10 + technology * 0.10
+                val specPart = camera * 0.45 + performance * 0.10 + design * 0.20 + technology * 0.25
                 (priceUtility * 0.15) + (specPart * 0.85)
             }
             "FUTURISTIC" -> {
@@ -581,7 +655,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 else if (price >= 3500.0) 5.0
                 else ((3500.0 - price) / 2600.0) * 100.0
 
-                val specPart = technology * 0.45 + performance * 0.25 + design * 0.15 + camera * 0.10
+                val specPart = technology * 0.40 + performance * 0.20 + design * 0.30 + camera * 0.10
                 (priceUtility * 0.05) + (specPart * 0.95)
             }
             else -> {
@@ -614,14 +688,55 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         return false
     }
 
+    fun upgradeFactory() {
+        val progress = currentPlayerProgress ?: return
+        val currentLevel = progress.factoryLevel
+        val nextConfig = GameDefaults.FactoryConfigs.firstOrNull { it.level == currentLevel + 1 } ?: return
+        
+        if (progress.funds >= nextConfig.upgradeCost) {
+            GameSoundPlayer.playUpgradeSuccessSound()
+            viewModelScope.launch {
+                val updatedProgress = progress.copy(
+                    funds = progress.funds - nextConfig.upgradeCost,
+                    factoryLevel = nextConfig.level
+                )
+                repository.savePlayerProgress(updatedProgress)
+            }
+        }
+    }
+
+    fun upgradeRD() {
+        val progress = currentPlayerProgress ?: return
+        val nextLevel = progress.rdLevel + 1
+        val upgradeCost = 25000.0 * nextLevel.toDouble().pow(1.5)
+        
+        if (progress.funds >= upgradeCost) {
+            GameSoundPlayer.playUpgradeSuccessSound()
+            viewModelScope.launch {
+                val updatedProgress = progress.copy(
+                    funds = progress.funds - upgradeCost,
+                    rdLevel = nextLevel
+                )
+                repository.savePlayerProgress(updatedProgress)
+            }
+        }
+    }
+
     private fun calculateStats(
         selectedColor: PhoneColor,
         selectedProcessor: ProcessorOption,
         selectedCamera: CameraOption,
         selectedDesign: DesignStyle,
         selectedBattery: BatteryOption,
-        selectedTechs: Set<CustomTechnology>
+        selectedDisplay: DisplayOption,
+        selectedOs: OsOption,
+        selectedTechs: Set<CustomTechnology>,
+        cameraPosition: CameraPosition
     ): PhoneStats {
+        val progress = currentPlayerProgress
+        val factoryLevel = progress?.factoryLevel ?: 1
+        val factoryConfig = GameDefaults.FactoryConfigs.firstOrNull { it.level == factoryLevel } ?: GameDefaults.FactoryConfigs.first()
+
         // Load worker levels
         val perfLevel = getWorkerLevel("worker_performance_lvl")
         val designLevel = getWorkerLevel("worker_design_lvl")
@@ -632,10 +747,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         var performance = selectedProcessor.performanceScore + (perfLevel - 1) * 6.0
         var cameraPower = selectedCamera.cameraScore + (cameraLevel - 1) * 6.0
         var designScore = selectedDesign.designScore + selectedColor.designBonus + (designLevel - 1) * 6.0
-        var techAppeal = selectedBattery.scoreBonus + (techLevel - 1) * 6.0
+        var techAppeal = selectedBattery.scoreBonus + selectedDisplay.displayScore + selectedOs.uiBonus + (techLevel - 1) * 6.0
 
         // Accumulate feature additions
-        var totalCost = selectedProcessor.baseCost + selectedCamera.baseCost + selectedDesign.baseCost + selectedColor.colorCost + selectedBattery.baseCost
+        var totalCost = selectedProcessor.baseCost + selectedCamera.baseCost + selectedDesign.baseCost + 
+                        selectedColor.colorCost + selectedBattery.baseCost + selectedDisplay.baseCost + selectedOs.baseCost
  
         selectedTechs.forEach { tech ->
             totalCost += tech.addedCost
@@ -644,6 +760,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 designScore += 5.0
             }
         }
+
+        // Apply Factory Cost Reduction
+        totalCost = max(5.0, totalCost - factoryConfig.unitCostReduction)
 
         // Clip maximums
         performance = min(100.0, performance)
@@ -656,7 +775,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             cameraPower = cameraPower,
             designSelection = designScore,
             technologyAppeal = techAppeal,
-            manufacturingCost = totalCost
+            manufacturingCost = totalCost,
+            cameraPosition = cameraPosition
         )
     }
 
