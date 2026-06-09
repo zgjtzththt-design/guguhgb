@@ -552,6 +552,41 @@ fun PhoneCreatorScreen(
                                                 fontWeight = FontWeight.Bold,
                                                 textAlign = TextAlign.Right
                                             )
+                                            
+                                            if (!isLocked) {
+                                                // Display Quality Bar
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "الجودة: ${disp.displayScore.toInt()}/100",
+                                                        color = Color(0xFF4AD66D),
+                                                        fontSize = 9.sp,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .width(60.dp)
+                                                            .height(4.dp)
+                                                            .clip(CircleShape)
+                                                            .background(Color.White.copy(alpha = 0.1f))
+                                                    ) {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .fillMaxWidth( (disp.displayScore / 100f).toFloat() )
+                                                                .fillMaxHeight()
+                                                                .background(
+                                                                    Brush.horizontalGradient(
+                                                                        listOf(Color(0xFF4AD66D), Color(0xFF06D6A0))
+                                                                    )
+                                                                )
+                                                        )
+                                                    }
+                                                }
+                                            }
+
                                             Text(
                                                 text = if (isLocked) "ارتقِ بمستوى شركتك لفتح هذا المكون المتطور." else disp.techDetailAr,
                                                 color = Color.White.copy(alpha = 0.5f),
@@ -731,6 +766,41 @@ fun PhoneCreatorScreen(
                                                 fontWeight = FontWeight.Bold,
                                                 textAlign = TextAlign.Right
                                             )
+                                            
+                                            if (!isLocked) {
+                                                // Performance Power Bar
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "القوة: ${cpu.performanceScore.toInt()}/100",
+                                                        color = Color(0xFFFFB703),
+                                                        fontSize = 9.sp,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .width(60.dp)
+                                                            .height(4.dp)
+                                                            .clip(CircleShape)
+                                                            .background(Color.White.copy(alpha = 0.1f))
+                                                    ) {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .fillMaxWidth( (cpu.performanceScore / 100f).toFloat() )
+                                                                .fillMaxHeight()
+                                                                .background(
+                                                                    Brush.horizontalGradient(
+                                                                        listOf(Color(0xFFFFB703), Color(0xFFFB8500))
+                                                                    )
+                                                                )
+                                                        )
+                                                    }
+                                                }
+                                            }
+
                                             Text(
                                                 text = if (isLocked) "هذا المعالج الجبار متاح لشركات المستوى المتقدم فقط." else cpu.techDetailAr,
                                                 color = Color.White.copy(alpha = 0.5f),
@@ -822,6 +892,48 @@ fun PhoneCreatorScreen(
                                                 fontWeight = FontWeight.Bold,
                                                 textAlign = TextAlign.Right
                                             )
+
+                                            if (!isLocked) {
+                                                // Battery Efficiency Bar
+                                                val batteryScore = when(rawBattery.id) {
+                                                    "lithium_basic" -> 25f
+                                                    "silicon_balanced" -> 50f
+                                                    "graphene_pro" -> 75f
+                                                    "nuclear_quantum" -> 98f
+                                                    else -> 30f
+                                                }
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "الكفاءة: ${batteryScore.toInt()}%",
+                                                        color = Color(0xFF4AD66D),
+                                                        fontSize = 9.sp,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .width(60.dp)
+                                                            .height(4.dp)
+                                                            .clip(CircleShape)
+                                                            .background(Color.White.copy(alpha = 0.1f))
+                                                    ) {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .fillMaxWidth(batteryScore / 100f)
+                                                                .fillMaxHeight()
+                                                                .background(
+                                                                    Brush.horizontalGradient(
+                                                                        listOf(Color(0xFF4AD66D), Color(0xFF06D6A0))
+                                                                    )
+                                                                )
+                                                        )
+                                                    }
+                                                }
+                                            }
+
                                             Text(
                                                 text = if (isLocked) "خوارزميات إدارة الطاقة المتقدمة لم تكتشف بعد." else rawBattery.descAr,
                                                 color = Color.White.copy(alpha = 0.5f),
@@ -913,6 +1025,41 @@ fun PhoneCreatorScreen(
                                                 fontWeight = FontWeight.Bold,
                                                 textAlign = TextAlign.Right
                                             )
+
+                                            if (!isLocked) {
+                                                // Camera Power Bar
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "القوة: ${cam.cameraScore.toInt()}/100",
+                                                        color = Color(0xFFE11D48),
+                                                        fontSize = 9.sp,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .width(60.dp)
+                                                            .height(4.dp)
+                                                            .clip(CircleShape)
+                                                            .background(Color.White.copy(alpha = 0.1f))
+                                                    ) {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .fillMaxWidth((cam.cameraScore / 100f).toFloat())
+                                                                .fillMaxHeight()
+                                                                .background(
+                                                                    Brush.horizontalGradient(
+                                                                        listOf(Color(0xFFE11D48), Color(0xFFFB7185))
+                                                                    )
+                                                                )
+                                                        )
+                                                    }
+                                                }
+                                            }
+
                                             Text(
                                                 text = if (isLocked) "هذه التكنولوجيا البصرية متاحة فقط للمصورين المحترفين." else cam.megapixelsTextAr,
                                                 color = Color.White.copy(alpha = 0.5f),
@@ -1015,6 +1162,39 @@ fun PhoneCreatorScreen(
                                                 Spacer(modifier = Modifier.width(4.dp))
                                                 Text(text = lensOpt.iconEmoji, fontSize = 14.sp)
                                             }
+
+                                            // Lens Quality Bar
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier.padding(top = 2.dp, bottom = 2.dp)
+                                            ) {
+                                                Text(
+                                                    text = "الجودة: ${lensOpt.qualityScore.toInt()}/100",
+                                                    color = Color(0xFF5CC4FF),
+                                                    fontSize = 8.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Box(
+                                                    modifier = Modifier
+                                                        .width(50.dp)
+                                                        .height(3.dp)
+                                                        .clip(CircleShape)
+                                                        .background(Color.White.copy(alpha = 0.1f))
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth((lensOpt.qualityScore / 100f).toFloat())
+                                                            .fillMaxHeight()
+                                                            .background(
+                                                                Brush.horizontalGradient(
+                                                                    listOf(Color(0xFF5CC4FF), Color(0xFF00B4D8))
+                                                                )
+                                                            )
+                                                    )
+                                                }
+                                            }
+
                                             Text(
                                                 text = lensOpt.descAr,
                                                 color = Color.White.copy(alpha = 0.5f),
